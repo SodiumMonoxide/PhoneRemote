@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#142322">
+  <title>电脑遥控</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-content">
+      <h1>电脑遥控</h1>
+      <div class="connection">
+        <span id="status" class="status" data-state="offline" role="status">未连接</span>
+        <button id="disconnect" class="subtle" type="button" hidden>断开</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="pair-panel" class="pair-panel" aria-labelledby="pair-title">
+      <h2 id="pair-title">连接电脑</h2>
+      <p>输入电脑端窗口显示的 8 位配对码。</p>
+      <form id="pair-form">
+        <label for="pair-code">配对码</label>
+        <input id="pair-code" name="code" inputmode="numeric" enterkeyhint="go"
+          autocomplete="off" spellcheck="false" maxlength="8" required>
+        <label id="remember-option" class="remember-option" hidden>
+          <input id="remember-device" type="checkbox" checked>
+          记住这部手机，之后直接连接
+        </label>
+        <button id="pair-button" class="primary" type="submit">连接</button>
+      </form>
+      <button id="resume-button" type="button" class="resume-button" hidden>连接已配对的电脑</button>
+      <p id="pair-message" class="message" role="status"></p>
+    </section>
+
+    <section id="remote-panel" hidden aria-label="遥控面板">
+      <figure id="viewport" class="viewport" data-ready="false">
+        <img id="screen" class="screen" alt="电脑主屏幕" draggable="false" hidden>
+        <figcaption id="frame-message">正在获取画面…</figcaption>
+      </figure>
+
+      <section class="controls" aria-label="输入控制">
+        <fieldset id="mouse-controls" class="mouse-controls" disabled>
+          <legend class="visually-hidden">鼠标操作</legend>
+          <div class="modes" aria-describedby="mode-help">
+            <button type="button" data-mode="click" aria-pressed="true">左键</button>
+            <button type="button" data-mode="doubleClick" aria-pressed="false">双击</button>
+            <button type="button" data-mode="rightClick" aria-pressed="false">右键</button>
+            <button type="button" data-mode="move" aria-pressed="false">移动</button>
+            <button type="button" data-mode="drag" aria-pressed="false">拖动</button>
+          </div>
+          <p id="mode-help" class="mode-help">轻点画面中的位置。</p>
+          <div class="scroll-controls">
+            <button type="button" data-scroll="3">向上滚动</button>
+            <button type="button" data-scroll="-3">向下滚动</button>
+          </div>
+        </fieldset>
+
+        <details class="extra">
+          <summary>输入文字</summary>
+          <form id="text-form" class="text-form">
+            <fieldset id="text-controls" disabled>
+              <legend class="visually-hidden">向电脑输入文字</legend>
+              <label for="text-input">文字内容</label>
+              <textarea id="text-input" rows="3" maxlength="256"
+                placeholder="使用手机输入法输入" required></textarea>
+              <button class="primary" type="submit">发送文字</button>
+            </fieldset>
+          </form>
+        </details>
+
+        <details class="extra">
+          <summary>按键与快捷键</summary>
+          <fieldset id="key-controls" class="key-grid" disabled>
+            <legend class="visually-hidden">按键与快捷键</legend>
+            <button type="button" data-key="Enter">回车</button>
+            <button type="button" data-key="Escape">Esc</button>
+            <button type="button" data-key="Backspace">退格</button>
+            <button type="button" data-key="Delete">删除</button>
+            <button type="button" data-key="Tab">Tab</button>
+            <button type="button" data-key="Space">空格</button>
+            <button type="button" data-key="ArrowUp" aria-label="方向键 上">↑</button>
+            <button type="button" data-key="ArrowDown" aria-label="方向键 下">↓</button>
+            <button type="button" data-key="ArrowLeft" aria-label="方向键 左">←</button>
+            <button type="button" data-key="ArrowRight" aria-label="方向键 右">→</button>
+            <button type="button" data-key="Home">Home</button>
+            <button type="button" data-key="End">End</button>
+            <button type="button" data-key="PageUp">PgUp</button>
+            <button type="button" data-key="PageDown">PgDn</button>
+            <button type="button" data-key="F5">F5</button>
+            <button type="button" data-key="Ctrl+A">全选</button>
+            <button type="button" data-key="Ctrl+C">复制</button>
+            <button type="button" data-key="Ctrl+V">粘贴</button>
+            <button type="button" data-key="Ctrl+X">剪切</button>
+            <button type="button" data-key="Ctrl+Z">撤销</button>
+            <button type="button" data-key="Alt+Tab">切换窗口</button>
+            <button type="button" data-key="Win+D">显示桌面</button>
+          </fieldset>
+        </details>
+        <p id="input-message" class="message" role="status"></p>
+      </section>
+    </section>
+  </main>
+</body>
+</html>
