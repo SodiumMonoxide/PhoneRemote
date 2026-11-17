@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>PhoneRemote</AssemblyName>
+    <Version>2.3.0</Version>
+    <RootNamespace>RemoteControl</RootNamespace>
+    <Product>手机遥控电脑</Product>
+    <Description>Windows 主机与安卓手机的局域网和 Tailscale 遥控</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <EmbeddedResource Include="Web\index.html" LogicalName="Web.index.html" />
+    <EmbeddedResource Include="Web\styles.css" LogicalName="Web.styles.css" />
+    <EmbeddedResource Include="Web\app.js" LogicalName="Web.app.js" />
+  </ItemGroup>
+</Project>
