@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../windows/WindowsClientForm.cs" Link="WindowsClientForm.cs" />
+    <Compile Include="../../windows/WindowsRemoteView.cs" Link="WindowsRemoteView.cs" />
+    <Compile Include="../../windows/WindowsRemoteClient.cs" Link="WindowsRemoteClient.cs" />
+    <Compile Include="../../windows/WindowsClientProfiles.cs" Link="WindowsClientProfiles.cs" />
+    <Compile Include="../../windows/ScopedKeyboardCapture.cs" Link="ScopedKeyboardCapture.cs" />
+    <Compile Include="../../windows/RemoteToolbar.cs" Link="RemoteToolbar.cs" />
+    <Compile Include="../../windows/RemoteTextDialog.cs" Link="RemoteTextDialog.cs" />
+    <Compile Include="../../windows/RemoteInputFlow.cs" Link="RemoteInputFlow.cs" />
+  </ItemGroup>
+</Project>
