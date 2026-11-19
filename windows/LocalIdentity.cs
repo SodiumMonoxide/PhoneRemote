@@ -10,19 +10,19 @@ internal sealed record SavedDevice(string TokenHash, string Peer, string Host);
 
 internal sealed class LocalIdentity(string directory, ConnectionAddress endpoint)
 {
+    internal const int MaximumDevices = 16;
     private string DevicePath => Path.Combine(directory, endpoint.IsTailscale
         ? "device-tailscale.json" : "device-lan.json");
+    private string AdditionalDevicesPath => Path.Combine(directory, endpoint.IsTailscale
+        ? "devices-additional-tailscale.json" : "devices-additional-lan.json");
 
     public SavedDevice? LoadDevice()
     {
         try
         {
             var device = JsonSerializer.Deserialize<SavedDevice>(File.ReadAllBytes(DevicePath));
-            if (device?.TokenHash is not { Length: 64 } || !device.TokenHash.All(Uri.IsHexDigit) ||
-                !IPAddress.TryParse(device.Peer, out IPAddress? peer) ||
-                !IPAddress.TryParse(device.Host, out IPAddress? host))
-                throw new InvalidDataException("已记住的手机记录无法读取。");
-            return endpoint.Address.Equals(host) && endpoint.AllowsPeer(peer) ? device : null;
+            Validate(device);
+            return MatchesEndpoint(device!) ? device : null;
         }
         catch (FileNotFoundException)
         {
@@ -37,7 +37,59 @@ internal sealed class LocalIdentity(string directory, ConnectionAddress endpoint
     public void SaveDevice(SavedDevice device) =>
         WriteAtomically(DevicePath, JsonSerializer.SerializeToUtf8Bytes(device));
 
-    public void ForgetDevice() => File.Delete(DevicePath);
+    public IReadOnlyList<SavedDevice> LoadDevices()
+    {
+        var devices = LoadAdditionalDevices();
+        if (LoadDevice() is { } legacy)
+            devices.Insert(0, legacy);
+        return devices.Where(MatchesEndpoint).DistinctBy(device => device.TokenHash).ToArray();
+    }
+
+    public void AddDevice(SavedDevice device)
+    {
+        Validate(device);
+        var devices = LoadAdditionalDevices();
+        // Keep the original single-device file unchanged during upgrades and enrollment.
+        // Count all stored records, including addresses that are temporarily unavailable.
+        int count = devices.Count + (File.Exists(DevicePath) ? 1 : 0);
+        if (count >= MaximumDevices)
+            throw new IOException("已记住的设备已达上限，请先在电脑上忘记所有设备后重新配对。");
+        devices.Add(device);
+        WriteAtomically(AdditionalDevicesPath, JsonSerializer.SerializeToUtf8Bytes(devices));
+    }
+
+    public void ForgetDevice()
+    {
+        File.Delete(AdditionalDevicesPath);
+        File.Delete(DevicePath);
+    }
+
+    private List<SavedDevice> LoadAdditionalDevices()
+    {
+        try
+        {
+            if (new FileInfo(AdditionalDevicesPath).Length > 32 * 1024)
+                throw new InvalidDataException("已记住的设备记录过大。");
+            var devices = JsonSerializer.Deserialize<List<SavedDevice>>(File.ReadAllBytes(AdditionalDevicesPath));
+            if (devices is null || devices.Count > MaximumDevices)
+                throw new InvalidDataException("已记住的设备记录无法读取。");
+            foreach (var device in devices)
+                Validate(device);
+            return devices;
+        }
+        catch (FileNotFoundException) { return []; }
+        catch (DirectoryNotFoundException) { return []; }
+    }
+
+    private static void Validate(SavedDevice? device)
+    {
+        if (device?.TokenHash is not { Length: 64 } || !device.TokenHash.All(Uri.IsHexDigit) ||
+            !IPAddress.TryParse(device.Peer, out _) || !IPAddress.TryParse(device.Host, out _))
+            throw new InvalidDataException("已记住的设备记录无法读取。");
+    }
+
+    private bool MatchesEndpoint(SavedDevice device) =>
+        endpoint.Address.Equals(IPAddress.Parse(device.Host)) && endpoint.AllowsPeer(IPAddress.Parse(device.Peer));
 
     public X509Certificate2 LoadCertificate()
     {

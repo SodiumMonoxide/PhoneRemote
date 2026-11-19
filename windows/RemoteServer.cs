@@ -37,7 +37,8 @@ internal sealed class RemoteServer : IAsyncDisposable
     private DateTimeOffset codeExpiresAt;
     private int failedAttempts;
     private DateTimeOffset retryAt;
-    private SavedDevice? remembered;
+    private IReadOnlyList<SavedDevice> remembered;
+    private string? activeDeviceHash;
     private bool closing;
 
     private RemoteServer(ConnectionAddress address, string storageDirectory, RemoteControlSession control)
@@ -47,7 +48,7 @@ internal sealed class RemoteServer : IAsyncDisposable
         IPAddress localAddress = address.Address;
         Address = new UriBuilder(Uri.UriSchemeHttps, localAddress.ToString(), Port).Uri;
         identity = new LocalIdentity(storageDirectory, address);
-        remembered = identity.LoadDevice();
+        remembered = identity.LoadDevices();
         certificate = identity.LoadCertificate();
         Fingerprint = string.Join(":", SHA256.HashData(certificate.RawData).Select(b => b.ToString("X2")));
         try
@@ -83,7 +84,8 @@ internal sealed class RemoteServer : IAsyncDisposable
             certificate.Dispose();
             throw;
         }
-        RefreshCode();
+        if (remembered.Count == 0)
+            RefreshCode();
         timer = new System.Threading.Timer(_ => MaintainSession(), null, 350, 350);
     }
 
@@ -130,7 +132,7 @@ internal sealed class RemoteServer : IAsyncDisposable
         {
             MaintainSessionLocked();
             return new ServerStatus(code, code is null ? null : codeExpiresAt, control.IsConnectedLocked(this),
-                remembered is not null);
+                remembered.Count > 0);
         }
     }
 
@@ -139,7 +141,7 @@ internal sealed class RemoteServer : IAsyncDisposable
         lock (state)
         {
             MaintainSessionLocked();
-            if (closing || control.IsConnectedLocked(this) || remembered is not null)
+            if (closing || control.IsConnectedLocked(this) || remembered.Count >= LocalIdentity.MaximumDevices)
                 return false;
             code = RandomNumberGenerator.GetInt32(100_000_000).ToString("D8", CultureInfo.InvariantCulture);
             codeExpiresAt = DateTimeOffset.UtcNow + CodeLifetime;
@@ -160,12 +162,16 @@ internal sealed class RemoteServer : IAsyncDisposable
     {
         lock (state)
         {
-            if (remembered is null)
-                return;
-            identity.ForgetDevice();
-            remembered = null;
             code = null;
             control.DisconnectLocked(this);
+            try
+            {
+                identity.ForgetDevice();
+            }
+            finally
+            {
+                remembered = identity.LoadDevices();
+            }
         }
     }
 
@@ -254,7 +260,7 @@ internal sealed class RemoteServer : IAsyncDisposable
             await WriteBytesAsync(context, asset.Bytes, asset.ContentType);
             return;
         }
-        if (context.Request.Path.Value != "/api/frame")
+        if (context.Request.Path.Value is not ("/api/frame" or "/api/capabilities"))
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
@@ -268,6 +274,11 @@ internal sealed class RemoteServer : IAsyncDisposable
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
             }
+        }
+        if (context.Request.Path.Value == "/api/capabilities")
+        {
+            await context.Response.WriteAsJsonAsync(new { rawKeyboard = true, version = "2.5.0" }, context.RequestAborted);
+            return;
         }
         byte[]? frame = control.Capture();
         lock (state)
@@ -343,7 +354,7 @@ internal sealed class RemoteServer : IAsyncDisposable
         lock (state)
         {
             MaintainSessionLocked();
-            if (control.IsConnectedLocked(this) || remembered is not null)
+            if (control.IsConnectedLocked(this) || remembered.Count >= LocalIdentity.MaximumDevices)
             {
                 response.StatusCode = StatusCodes.Status409Conflict;
                 return null;
@@ -383,17 +394,18 @@ internal sealed class RemoteServer : IAsyncDisposable
                 var device = new SavedDevice(HashToken(deviceToken), peer.ToString(), Address.Host);
                 try
                 {
-                    identity.SaveDevice(device);
+                    identity.AddDevice(device);
                 }
                 catch (Exception error) when (error is IOException or UnauthorizedAccessException)
                 {
                     response.StatusCode = StatusCodes.Status503ServiceUnavailable;
                     return null;
                 }
-                remembered = device;
+                remembered = remembered.Append(device).ToArray();
             }
             var token = NewToken();
             control.OpenLocked(this, token, peer);
+            activeDeviceHash = deviceToken is null ? null : HashToken(deviceToken);
             code = null;
             failedAttempts = 0;
             return new PairResponse(token, deviceToken);
@@ -405,20 +417,29 @@ internal sealed class RemoteServer : IAsyncDisposable
         lock (state)
         {
             MaintainSessionLocked();
-            if (closing || remembered is not { } device || request?.DeviceToken is not { Length: 64 } deviceToken ||
-                device.Host != Address.Host || (endpoint.IsTailscale && device.Peer != peer.ToString()) ||
-                !RemoteControlSession.FixedEquals(HashToken(deviceToken), device.TokenHash))
+            if (closing || request?.DeviceToken is not { Length: 64 } deviceToken)
             {
                 response.StatusCode = StatusCodes.Status401Unauthorized;
                 return null;
             }
-            if (!control.CanOpenLocked(this, request.SwitchMode))
+            string hash = HashToken(deviceToken);
+            var device = remembered.FirstOrDefault(saved => saved.Host == Address.Host &&
+                (!endpoint.IsTailscale || saved.Peer == peer.ToString()) &&
+                RemoteControlSession.FixedEquals(hash, saved.TokenHash));
+            if (device is null)
+            {
+                response.StatusCode = StatusCodes.Status401Unauthorized;
+                return null;
+            }
+            if (!control.CanOpenLocked(this, request.SwitchMode) ||
+                (control.IsConnectedLocked(this) && activeDeviceHash != hash && !request.SwitchMode))
             {
                 response.StatusCode = StatusCodes.Status409Conflict;
                 return null;
             }
             var token = NewToken();
             control.OpenLocked(this, token, peer);
+            activeDeviceHash = hash;
             return token;
         }
     }

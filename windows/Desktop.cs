@@ -18,6 +18,8 @@ internal sealed class ControlInput
     public int? Delta { get; set; }
     public string? Text { get; set; }
     public string? Key { get; set; }
+    public int? VirtualKey { get; set; }
+    public bool Extended { get; set; }
 }
 
 internal sealed class Desktop
@@ -66,6 +68,23 @@ internal sealed class Desktop
     };
 
     private bool leftButtonDown;
+    private readonly Dictionary<ushort, bool> heldKeys = new();
+    private readonly HashSet<ushort> borrowedKeys = new();
+    private readonly List<NativeInput> pendingReleases = new();
+    private readonly Func<NativeInput[], int> sendInput;
+    private readonly Func<bool> interactive;
+    private readonly Func<int, bool> isKeyDown;
+
+    // Tests supply an in-memory backend; the production path keeps all native input here.
+    internal Desktop(Func<NativeInput[], int>? sendInput = null, Func<bool>? interactive = null,
+        Func<int, bool>? isKeyDown = null)
+    {
+        this.sendInput = sendInput ?? (events => (int)SendInput((uint)events.Length, events, InputSize));
+        this.interactive = interactive ?? IsInteractiveDesktop;
+        this.isKeyDown = isKeyDown ?? (key => GetAsyncKeyState(key) < 0);
+    }
+
+    internal bool HasHeldInputs => leftButtonDown || heldKeys.Count != 0 || pendingReleases.Count != 0;
 
     public byte[] CaptureFrame()
     {
@@ -111,24 +130,78 @@ internal sealed class Desktop
             "scroll" => ApplyScroll(command),
             "text" => ApplyText(command.Text),
             "key" => ApplyKey(command.Key),
+            "keyDown" or "keyUp" => ApplyPhysicalKey(command),
+            "heartbeat" => true,
+            "releaseAll" => ReleaseAll(),
             _ => false
         };
     }
 
     public bool ReleaseButtons()
     {
-        if (!leftButtonDown)
-        {
-            return true;
-        }
-        if (!IsInteractiveDesktop() || SendInput(1, [MouseEvent(MouseLeftUp)], InputSize) != 1)
-        {
-            return false;
-        }
+        borrowedKeys.Clear();
+        if (!HasHeldInputs) return true;
+        if (!interactive()) return false;
+        // Release only input this Desktop injected, in reverse key-down order.
+        var releases = pendingReleases.ToList();
+        var keys = heldKeys.Reverse().ToArray();
+        releases.AddRange(keys.Select(key => KeyboardEvent(key.Key, 0, KeyUp | (key.Value ? KeyExtended : 0))));
+        if (leftButtonDown) releases.Add(MouseEvent(MouseLeftUp));
+        int sent = Math.Clamp(sendInput(releases.ToArray()), 0, releases.Count);
+        int pendingCount = pendingReleases.Count;
+        pendingReleases.RemoveRange(0, Math.Min(sent, pendingCount));
+        for (int index = 0; index < keys.Length && index + pendingCount < sent; index++)
+            heldKeys.Remove(keys[index].Key);
+        if (leftButtonDown && sent == releases.Count) leftButtonDown = false;
+        return !HasHeldInputs;
+    }
 
-        leftButtonDown = false;
+    private bool ReleaseAll()
+    {
+        if (!ReleaseButtons())
+            throw new InvalidOperationException("Windows 暂时无法释放输入，请在被控电脑解锁后重试。");
         return true;
     }
+
+    internal static bool IsSupportedVirtualKey(int key) => key is 0x03 or 0x08 or 0x09 or 0x0C or 0x0D ||
+        key is >= 0x10 and <= 0x39 || key is >= 0x41 and <= 0x5D ||
+        key is >= 0x5F and <= 0x87 || key is >= 0x90 and <= 0x96 ||
+        key is >= 0xA0 and <= 0xB7 || key is >= 0xBA and <= 0xC0 ||
+        key is >= 0xDB and <= 0xDF || key is 0xE1 or 0xE2 || key is >= 0xF6 and <= 0xFB || key is 0xFD or 0xFE;
+
+    private bool ApplyPhysicalKey(ControlInput command)
+    {
+        if (command.VirtualKey is not int value || !IsSupportedVirtualKey(value)) return false;
+        ushort key = (ushort)value;
+        bool down = command.Action == "keyDown";
+        if (!down)
+        {
+            if (borrowedKeys.Remove(key)) return true;
+            if (!heldKeys.TryGetValue(key, out bool extended)) return true;
+            EnsureInteractiveDesktop();
+            if (sendInput([KeyboardEvent(key, 0, KeyUp | (extended ? KeyExtended : 0))]) != 1)
+                throw new InvalidOperationException("Windows 未接收按键释放。");
+            heldKeys.Remove(key);
+            return true;
+        }
+        EnsureInteractiveDesktop();
+        // Ctrl+Alt+Delete is a secure-attention sequence, never a remotely injected shortcut.
+        if (key == (ushort)Keys.Delete && ModifierHeld(Keys.ControlKey, Keys.LControlKey, Keys.RControlKey) &&
+            ModifierHeld(Keys.Menu, Keys.LMenu, Keys.RMenu)) return false;
+        if (borrowedKeys.Contains(key)) return true;
+        if (!heldKeys.ContainsKey(key) && isKeyDown(key))
+        {
+            borrowedKeys.Add(key);
+            return true;
+        }
+        bool keyExtended = heldKeys.TryGetValue(key, out bool existing) ? existing : command.Extended;
+        if (sendInput([KeyboardEvent(key, 0, keyExtended ? KeyExtended : 0)]) != 1)
+            throw new InvalidOperationException("Windows 未接收按键按下。");
+        heldKeys[key] = keyExtended;
+        return true;
+    }
+
+    private bool ModifierHeld(params Keys[] keys) => keys.Any(key => heldKeys.ContainsKey((ushort)key) || isKeyDown((int)key));
 
     private bool ApplyPointer(ControlInput command)
     {
@@ -180,7 +253,7 @@ internal sealed class Desktop
         return true;
     }
 
-    private static bool ApplyScroll(ControlInput command)
+    private bool ApplyScroll(ControlInput command)
     {
         if (command.Delta is not int delta || delta == 0 || delta < -8 || delta > 8)
         {
@@ -204,7 +277,7 @@ internal sealed class Desktop
         return true;
     }
 
-    private static bool ApplyText(string? text)
+    private bool ApplyText(string? text)
     {
         if (string.IsNullOrEmpty(text) || text.Length > 256)
         {
@@ -247,7 +320,7 @@ internal sealed class Desktop
         return true;
     }
 
-    private static bool ApplyKey(string? name)
+    private bool ApplyKey(string? name)
     {
         if (name is null || !KeyBindings.TryGetValue(name, out var binding))
         {
@@ -255,7 +328,7 @@ internal sealed class Desktop
         }
 
         EnsureInteractiveDesktop();
-        bool pressModifier = binding.Modifier != Keys.None && GetAsyncKeyState((int)binding.Modifier) >= 0;
+        bool pressModifier = binding.Modifier != Keys.None && !isKeyDown((int)binding.Modifier);
         NativeInput press = KeyEvent(binding.Key);
         NativeInput release = KeyEvent(binding.Key, release: true);
         Inject(pressModifier
@@ -278,9 +351,9 @@ internal sealed class Desktop
         return true;
     }
 
-    private static void EnsureInteractiveDesktop()
+    private void EnsureInteractiveDesktop()
     {
-        if (!IsInteractiveDesktop())
+        if (!interactive())
         {
             throw new InvalidOperationException("Windows 桌面暂不可用，请在电脑上解锁或关闭系统提示。");
         }
@@ -369,9 +442,9 @@ internal sealed class Desktop
         };
     }
 
-    private static void Inject(NativeInput[] events)
+    private void Inject(NativeInput[] events)
     {
-        int sent = (int)SendInput((uint)events.Length, events, InputSize);
+        int sent = Math.Clamp(sendInput(events), 0, events.Length);
         if (sent == events.Length)
         {
             return;
@@ -384,7 +457,7 @@ internal sealed class Desktop
         throw new InvalidOperationException("Windows 未接收本次输入。请确认当前窗口接受普通用户输入。");
     }
 
-    private static void ReleaseInterruptedInputs(ReadOnlySpan<NativeInput> sent)
+    private void ReleaseInterruptedInputs(ReadOnlySpan<NativeInput> sent)
     {
         var releases = new List<NativeInput>();
         uint mouseRelease = 0;
@@ -423,26 +496,27 @@ internal sealed class Desktop
         if (releases.Count > 0)
         {
             releases.Reverse();
-            SendInput((uint)releases.Count, releases.ToArray(), InputSize);
+            int released = Math.Clamp(sendInput(releases.ToArray()), 0, releases.Count);
+            pendingReleases.AddRange(releases.Skip(released));
         }
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct NativeInput
+    internal struct NativeInput
     {
         public uint Type;
         public InputData Data;
     }
 
     [StructLayout(LayoutKind.Explicit)]
-    private struct InputData
+    internal struct InputData
     {
         [FieldOffset(0)] public MouseInput Mouse;
         [FieldOffset(0)] public KeyInput Keyboard;
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct MouseInput
+    internal struct MouseInput
     {
         public int X, Y;
         public uint MouseData, Flags, Time;
@@ -450,7 +524,7 @@ internal sealed class Desktop
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct KeyInput
+    internal struct KeyInput
     {
         public ushort Key, ScanCode;
         public uint Flags, Time;

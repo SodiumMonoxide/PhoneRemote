@@ -53,12 +53,13 @@ internal sealed partial class HostForm
         _trayLan.Click += (_, _) => { _lan.Selector.Checked = true; RestoreWindow(); };
         _trayTailscale.Click += (_, _) => { _tailscale.Selector.Checked = true; RestoreWindow(); };
         _trayMenu.Items.Add(new ToolStripSeparator());
+        _trayMenu.Items.Add("控制另一台电脑", null, (_, _) => ShowComputerClient());
         _trayMenu.Items.Add("使用指南", null, (_, _) => ShowGuide());
         _trayMenu.Items.Add(_trayExit);
         _trayExit.Click += (_, _) => RequestExit();
         _tray.ContextMenuStrip = _trayMenu;
         _tray.Icon = _stoppedIcon;
-        _tray.Text = "手机遥控电脑";
+        _tray.Text = "PhoneRemote";
         _tray.DoubleClick += (_, _) => RestoreWindow();
         _tray.BalloonTipClicked += (_, _) => RestoreWindow();
         _trayMenu.Opening += (_, _) => UpdateDisplay();
@@ -88,7 +89,7 @@ internal sealed partial class HostForm
         if (!_trayNoticeShown)
         {
             _trayNoticeShown = true;
-            _tray.ShowBalloonTip(4000, "手机遥控电脑正在后台运行",
+            _tray.ShowBalloonTip(4000, "PhoneRemote 正在后台运行",
                 "已启动的连接保持运行。双击右下角托盘图标恢复窗口，右键可查看状态或退出。",
                 ToolTipIcon.Info);
         }
@@ -123,13 +124,13 @@ internal sealed partial class HostForm
     {
         if (_trayDisposed)
             return;
-        static string Describe(ServerStatus? state) => state?.Connected == true ? "手机已连接"
+        static string Describe(ServerStatus? state) => state?.Connected == true ? "设备已连接"
             : state?.RememberedDevice == true ? "已配对，等待连接"
             : state is not null ? "运行中，等待配对" : "未启动";
         _trayLan.Text = $"局域网 · {Describe(lan)}";
         _trayTailscale.Text = $"Tailscale · {Describe(tailscale)}";
-        _tray.Text = _closeRequested ? "手机遥控电脑 · 正在退出…"
-            : $"手机遥控电脑\n局域网：{Describe(lan)}\nTailscale：{Describe(tailscale)}";
+        _tray.Text = _closeRequested ? "PhoneRemote · 正在退出…"
+            : $"PhoneRemote\n局域网：{Describe(lan)}\nTailscale：{Describe(tailscale)}";
         _tray.Icon = lan?.Connected == true || tailscale?.Connected == true ? _connectedIcon
             : lan is not null || tailscale is not null ? _runningIcon : _stoppedIcon;
         _trayExit.Enabled = _exit.Enabled = _background.Enabled = !_closeRequested;
@@ -142,6 +143,7 @@ internal sealed partial class HostForm
         {
             _trayDisposed = true;
             _statusTimer.Dispose();
+            _clientWindow?.Dispose();
             _tray.Visible = false;
             _tray.Dispose();
             _trayMenu.Dispose();

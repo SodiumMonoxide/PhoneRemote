@@ -9,18 +9,20 @@ namespace RemoteControl;
 internal sealed class RemoteControlSession
 {
     private static readonly TimeSpan SessionIdle = TimeSpan.FromSeconds(60);
-    private static readonly TimeSpan DragTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan HeldInputTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan FrameInterval = TimeSpan.FromMilliseconds(150);
 
     private readonly object frames = new();
-    private readonly Desktop desktop = new();
+    private readonly Desktop desktop;
     private ActiveSession? active;
-    private long? dragActivity;
+    private long? inputActivity;
     private bool releasePending;
     private long lastCapture;
     private byte[]? cachedFrame;
 
     internal object StateLock { get; } = new();
+
+    internal RemoteControlSession(Desktop? desktop = null) => this.desktop = desktop ?? new Desktop();
 
     // Each listener holds StateLock while reading or changing the shared controller.
     internal bool IsConnectedLocked(RemoteServer endpoint) => active?.Endpoint == endpoint;
@@ -56,7 +58,7 @@ internal sealed class RemoteControlSession
     {
         if (active is { } current && Stopwatch.GetElapsedTime(current.LastActivity) >= SessionIdle)
             DisconnectLocked(current.Endpoint);
-        if (releasePending || (dragActivity is long started && Stopwatch.GetElapsedTime(started) >= DragTimeout))
+        if (releasePending || (inputActivity is long started && Stopwatch.GetElapsedTime(started) >= HeldInputTimeout))
             ReleaseDragLocked();
     }
 
@@ -68,10 +70,9 @@ internal sealed class RemoteControlSession
         {
             if (command is null || !desktop.Apply(command))
                 return StatusCodes.Status400BadRequest;
-            if (command.Action == "down" || (command.Action == "move" && dragActivity is not null))
-                dragActivity = Stopwatch.GetTimestamp();
-            if (command.Action == "up")
-                dragActivity = null;
+            // Frames do not keep held input alive: the capturing controller must
+            // send a heartbeat or another input event at least every two seconds.
+            inputActivity = desktop.HasHeldInputs ? Stopwatch.GetTimestamp() : null;
             return StatusCodes.Status204NoContent;
         }
         catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException)
@@ -107,7 +108,7 @@ internal sealed class RemoteControlSession
     private void ReleaseDragLocked()
     {
         releasePending = !desktop.ReleaseButtons();
-        dragActivity = null;
+        inputActivity = null;
     }
 
     private sealed record ActiveSession(RemoteServer Endpoint, string Token, IPAddress Peer)

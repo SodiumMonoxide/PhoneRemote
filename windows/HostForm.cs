@@ -18,13 +18,15 @@ internal sealed partial class HostForm : Form
     private readonly Button _refreshAddresses = MakeButton("刷新", 78);
     private readonly Button _startStop = MakeButton("启动连接", 106);
     private readonly Button _guide = MakeButton("使用指南", 106);
+    private readonly Button _controlComputer = MakeButton("控制另一台电脑", 154);
+    private WindowsClientForm? _clientWindow;
     private readonly Button _copyConnection = MakeButton("复制连接信息", 132);
     private readonly Button _copyAddress = MakeButton("复制", 78);
     private readonly Button _copyFingerprint = MakeButton("复制", 78);
     private readonly Button _copyCode = MakeButton("复制配对码", 106);
     private readonly Button _refreshCode = MakeButton("生成新码", 106);
-    private readonly Button _disconnect = MakeButton("断开手机", 106);
-    private readonly Button _forgetDevice = MakeButton("忘记手机", 106);
+    private readonly Button _disconnect = MakeButton("断开设备", 106);
+    private readonly Button _forgetDevice = MakeButton("忘记所有设备", 132);
     private readonly TextBox _address = MakeReadOnlyBox();
     private readonly TextBox _fingerprint = MakeReadOnlyBox();
     private readonly Label _connectionHint = MakeLabel("", Muted);
@@ -45,7 +47,7 @@ internal sealed partial class HostForm : Form
     public HostForm()
     {
         _mode = _lan;
-        Text = "手机遥控电脑";
+        Text = "PhoneRemote · 本机被控端";
         Font = new Font("Microsoft YaHei UI", 10F);
         ForeColor = Ink;
         BackColor = Color.White;
@@ -61,9 +63,9 @@ internal sealed partial class HostForm : Form
         _status.Font = new Font(Font, FontStyle.Bold);
         _code.Font = new Font("Segoe UI", 24F, FontStyle.Bold);
         _addresses.AccessibleName = "电脑的连接地址";
-        _address.AccessibleName = "手机访问地址";
+        _address.AccessibleName = "控制端访问地址";
         _fingerprint.AccessibleName = "证书 SHA-256 指纹";
-        _copyAddress.AccessibleName = "复制手机访问地址";
+        _copyAddress.AccessibleName = "复制控制端访问地址";
         _copyFingerprint.AccessibleName = "复制证书指纹";
         _fingerprint.Multiline = true;
         _fingerprint.WordWrap = false;
@@ -90,16 +92,18 @@ internal sealed partial class HostForm : Form
         };
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var title = MakeLabel("手机遥控电脑", Ink);
+        var title = MakeLabel("PhoneRemote", Ink);
         title.Font = new Font(Font.FontFamily, 23F, FontStyle.Bold);
         title.Margin = new Padding(0, 0, 0, 5);
-        var subtitle = MakeLabel("同网用局域网，异地用 Tailscale。可同时启动两种连接。", Muted);
+        var subtitle = MakeLabel("本机被控端 · 接受手机或 Windows 电脑连接。", Muted);
         subtitle.Margin = new Padding(0);
         _guide.Anchor = AnchorStyles.Right;
         header.Controls.Add(title, 0, 0);
         header.Controls.Add(_guide, 1, 0);
         header.Controls.Add(subtitle, 0, 1);
         header.SetColumnSpan(subtitle, 2);
+        header.Controls.Add(_controlComputer, 0, 2);
+        header.SetColumnSpan(_controlComputer, 2);
         var modes = new TableLayoutPanel
         {
             ColumnCount = 2,
@@ -114,7 +118,7 @@ internal sealed partial class HostForm : Form
         _tailscale.Selector.Margin = new Padding(5, 0, 0, 0);
         modes.Controls.Add(_lan.Selector, 0, 0);
         modes.Controls.Add(_tailscale.Selector, 1, 0);
-        header.Controls.Add(modes, 0, 2);
+        header.Controls.Add(modes, 0, 3);
         header.SetColumnSpan(modes, 2);
 
         AddRow(content, MakeLabel("电脑的连接地址", Ink), 3);
@@ -138,19 +142,19 @@ internal sealed partial class HostForm : Form
         pairing.Controls.Add(MakeActions(_copyCode, _refreshCode), 1, 1);
         pairing.Controls.Add(_expiration, 0, 2);
         pairing.Controls.Add(MakeActions(_disconnect, _forgetDevice), 1, 2);
-        var deviceHint = MakeLabel("断开手机只结束本次连接。忘记手机后，下次连接需重新配对。", Muted);
+        var deviceHint = MakeLabel("添加电脑时先断开当前控制，点「生成新码」。原有配对会保留。", Muted);
         pairing.Controls.Add(deviceHint, 0, 3);
         pairing.SetColumnSpan(deviceHint, 2);
         _expiration.Anchor = AnchorStyles.Left;
         AddRow(content, pairing, 12);
 
-        AddRow(content, MakeLabel("手机访问地址", Ink), 3);
+        AddRow(content, MakeLabel("控制端访问地址", Ink), 3);
         AddRow(content, MakeFieldRow(_address, _copyAddress, _copyConnection), 8);
-        AddRow(content, MakeLabel("在安卓 App 中填写地址和指纹，再输入电脑显示的配对码。", Muted), 12);
+        AddRow(content, MakeLabel("在安卓 App 或另一台电脑的控制端粘贴连接信息，再输入配对码。", Muted), 12);
 
         AddRow(content, MakeLabel("证书 SHA-256 指纹", Ink), 3);
         AddRow(content, MakeFieldRow(_fingerprint, _copyFingerprint), 8);
-        AddRow(content, MakeLabel("首次配对时，请在安卓 App 中填写完整的证书指纹。", Muted), 8);
+        AddRow(content, MakeLabel("首次配对须核对完整指纹。每种模式最多记住 16 台设备。", Muted), 8);
         AddRow(content, _notice, 0);
 
         var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
@@ -160,6 +164,7 @@ internal sealed partial class HostForm : Form
         Controls.Add(header);
 
         _guide.Click += (_, _) => ShowGuide();
+        _controlComputer.Click += (_, _) => ShowComputerClient();
         _lan.Selector.CheckedChanged += (_, _) => SelectMode(_lan);
         _tailscale.Selector.CheckedChanged += (_, _) => SelectMode(_tailscale);
         _lan.Selector.Checked = true;
@@ -192,16 +197,21 @@ internal sealed partial class HostForm : Form
         {
             if (_mode.Server?.RefreshCode() == true)
                 _notice.Text = "";
+            else
+                _notice.Text = "暂时无法生成新码：仍有设备连接，或已达 16 台配对上限。";
             UpdateDisplay();
         };
         _disconnect.Click += (_, _) =>
         {
             _mode.Server?.Disconnect();
-            _notice.Text = "本次连接已断开。记住的手机可再次连接。";
+            _notice.Text = "本次连接已断开。记住的设备可再次连接。";
             UpdateDisplay();
         };
         _forgetDevice.Click += (_, _) =>
         {
+            if (MessageBox.Show(this, $"撤销{_mode.Name}模式下所有手机和电脑的配对？之后这些设备都需要重新配对。",
+                "忘记所有设备", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK)
+                return;
             try
             {
                 _mode.Server?.ForgetDevice();
@@ -209,7 +219,7 @@ internal sealed partial class HostForm : Form
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, ex.Message, "无法取消手机配对", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, ex.Message, "无法取消设备配对", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             UpdateDisplay();
         };
@@ -219,6 +229,17 @@ internal sealed partial class HostForm : Form
 
         LoadAddresses();
         _statusTimer.Start();
+    }
+
+    private void ShowComputerClient()
+    {
+        if (_closeRequested) return;
+        if (_clientWindow is null || _clientWindow.IsDisposed)
+            _clientWindow = new WindowsClientForm();
+        _clientWindow.Show();
+        if (_clientWindow.WindowState == FormWindowState.Minimized)
+            _clientWindow.WindowState = FormWindowState.Normal;
+        _clientWindow.Activate();
     }
 
     private void SelectMode(ModePanel mode)
@@ -320,7 +341,7 @@ internal sealed partial class HostForm : Form
         }
 
         _closeRequested = true;
-        if (!_busy && _lan.Server is null && _tailscale.Server is null)
+        if (!_busy && _lan.Server is null && _tailscale.Server is null && (_clientWindow is null || _clientWindow.IsDisposed))
             return;
 
         e.Cancel = true;
@@ -335,6 +356,8 @@ internal sealed partial class HostForm : Form
         UpdateDisplay();
         try
         {
+            if (_clientWindow is { IsDisposed: false })
+                await _clientWindow.ShutdownAsync();
             await Task.WhenAll(StopModeAsync(_lan), StopModeAsync(_tailscale));
         }
         catch (Exception ex)
@@ -383,13 +406,14 @@ internal sealed partial class HostForm : Form
         _startStop.Enabled = !_busy && (server is not null || selected is not null);
         _startStop.Text = server is null ? "启动连接" : "停止连接";
         _connectionHint.Text = tailscale
-            ? selected is null ? "连接电脑上的 Tailscale 后，点击刷新。" : "手机和电脑的 Tailscale 须加入同一个网络。"
-            : selected is null ? "让电脑接入局域网后，点击刷新。" : "手机和电脑须接入同一个可信的局域网。";
+            ? selected is null ? "连接电脑上的 Tailscale 后，点击刷新。" : "控制端与本机的 Tailscale 须加入同一个网络。"
+            : selected is null ? "让电脑接入局域网后，点击刷新。" : "控制端与本机须接入同一个可信的局域网。";
         SetTextIfChanged(_address, server?.Address.AbsoluteUri ?? "");
         SetTextIfChanged(_fingerprint, FormatFingerprint(server?.Fingerprint));
         _copyAddress.Enabled = _copyFingerprint.Enabled = _copyConnection.Enabled = !_busy && server is not null;
         _copyCode.Enabled = !_busy && code is not null;
-        _refreshCode.Enabled = !_busy && server is not null && !connected && !remembered;
+        _refreshCode.Enabled = !_busy && server is not null && !connected;
+        _controlComputer.Enabled = !_closeRequested;
         _disconnect.Enabled = !_busy && connected;
         _forgetDevice.Enabled = !_busy && remembered;
 
@@ -401,7 +425,7 @@ internal sealed partial class HostForm : Form
             _status.Text = "服务未启动";
         else
         {
-            var deviceStatus = connected ? "手机已连接" : remembered ? "已配对，手机未连接" : "等待手机配对";
+            var deviceStatus = connected ? "控制设备已连接" : code is not null ? "等待新设备配对" : remembered ? "已配对，等待设备连接" : "等待设备配对";
             _status.Text = $"{_mode.Name} · {deviceStatus}";
         }
 
@@ -414,7 +438,7 @@ internal sealed partial class HostForm : Form
         else if (connected)
             _expiration.Text = "后台运行可继续遥控";
         else if (remembered)
-            _expiration.Text = "已配对手机可直接连接";
+            _expiration.Text = "已配对设备可直接连接";
         else if (server is not null)
             _expiration.Text = "点击生成新码开始配对";
         else
@@ -423,7 +447,7 @@ internal sealed partial class HostForm : Form
 
     private static void UpdateModeSelector(ModePanel mode, ServerStatus? status)
     {
-        var summary = status?.Connected == true ? "手机已连接"
+        var summary = status?.Connected == true ? "设备已连接"
             : status?.RememberedDevice == true ? "已配对"
             : status is not null ? "运行中" : "未启动";
         mode.Selector.Text = $"{mode.Name} · {summary}";
