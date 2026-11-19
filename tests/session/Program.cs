@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using RemoteControl;
 
@@ -83,7 +84,84 @@ using (var remote = new EndpointClient(tailscale))
     Check(await changedIp.Get("/api/frame", relocatedSession) == HttpStatusCode.OK,
         "stopping other listener leaves active connection intact");
 }
+await CheckAdditionalPairing(ConnectionAddress.Lan, false);
+await CheckAdditionalPairing(ConnectionAddress.Tailscale, true);
 Console.WriteLine("PASS live device settings were isolated from the smoke test");
+
+static async Task CheckAdditionalPairing(IPAddress address, bool isTailscale)
+{
+    string mode = isTailscale ? "tailscale" : "lan";
+    string stateDirectory = Path.Combine(Path.GetTempPath(), "PhoneRemote-tests",
+        "additional-" + mode + "-" + Guid.NewGuid().ToString("N"));
+    var identity = new LocalIdentity(stateDirectory, new ConnectionAddress(address, 8, isTailscale));
+    string phoneCredential = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+    string phoneHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(phoneCredential)));
+    identity.SaveDevice(new SavedDevice(phoneHash, IPAddress.Loopback.ToString(), address.ToString()));
+    string legacyPath = Path.Combine(stateDirectory, "device-" + mode + ".json");
+    byte[] originalBytes = File.ReadAllBytes(legacyPath);
+    string windowsCredential;
+    string pin;
+
+    await using (var server = await RemoteServer.StartAsync(address, stateDirectory))
+    using (var client = new EndpointClient(server))
+    {
+        pin = server.Fingerprint;
+        Check(server.GetStatus().RememberedDevice && server.GetStatus().Code is null,
+            mode + ": existing phone pairing starts with enrollment closed");
+        var phone = await client.Post("/api/resume", new { deviceToken = phoneCredential });
+        Check(phone.Status == HttpStatusCode.OK && !server.RefreshCode(),
+            mode + ": existing phone resumes and active control blocks new enrollment");
+        Check((await client.Post("/api/pair", new { code = "00000000", remember = true })).Status ==
+            HttpStatusCode.Conflict, mode + ": new pair cannot disturb active phone");
+        await client.Post("/api/disconnect", new { }, phone.Token());
+        Check(server.RefreshCode() && server.GetStatus().Code is { Length: 8 },
+            mode + ": explicit new code permits additional device without forgetting phone");
+        var windows = await client.Post("/api/pair", new { code = server.GetStatus().Code, remember = true });
+        windowsCredential = windows.Token("deviceToken");
+        Check(File.ReadAllBytes(legacyPath).SequenceEqual(originalBytes) &&
+            identity.LoadDevices().Count == 2 && !File.ReadAllText(Path.Combine(stateDirectory,
+                "devices-additional-" + mode + ".json")).Contains(windowsCredential, StringComparison.Ordinal),
+            mode + ": Windows pairing appends only a token hash and leaves legacy file unchanged");
+        Check((await client.Post("/api/resume", new { deviceToken = phoneCredential })).Status ==
+            HttpStatusCode.Conflict, mode + ": different saved device cannot silently take over same mode");
+        Check((await client.Post("/api/resume", new { deviceToken = windowsCredential })).Status ==
+            HttpStatusCode.OK, mode + ": same device can reconnect to its own active mode");
+        var phoneAgain = await client.Post("/api/resume", new { deviceToken = phoneCredential, switchMode = true });
+        Check(phoneAgain.Status == HttpStatusCode.OK &&
+            await client.Get("/api/frame", windows.Token()) == HttpStatusCode.Unauthorized,
+            mode + ": explicit handover works and invalidates previous session");
+    }
+
+    await using (var server = await RemoteServer.StartAsync(address, stateDirectory))
+    using (var client = new EndpointClient(server))
+    {
+        Check(server.Fingerprint == pin && server.GetStatus().Code is null &&
+            File.ReadAllBytes(legacyPath).SequenceEqual(originalBytes),
+            mode + ": restart preserves certificate and original pairing without opening enrollment");
+        var phone = await client.Post("/api/resume", new { deviceToken = phoneCredential });
+        Check(phone.Status == HttpStatusCode.OK, mode + ": legacy phone still resumes after restart");
+        await client.Post("/api/disconnect", new { }, phone.Token());
+        var windows = await client.Post("/api/resume", new { deviceToken = windowsCredential });
+        Check(windows.Status == HttpStatusCode.OK, mode + ": added Windows device resumes after restart");
+        using var movedClient = new EndpointClient(server, IPAddress.Parse("127.0.0.3"));
+        var moved = await movedClient.Post("/api/resume", new { deviceToken = windowsCredential, switchMode = true });
+        Check(moved.Status == (isTailscale ? HttpStatusCode.Unauthorized : HttpStatusCode.OK),
+            mode + ": added pairing preserves mode-specific source-address policy");
+        server.ForgetDevice();
+        Check(!server.GetStatus().RememberedDevice && !server.GetStatus().Connected &&
+            (await client.Post("/api/resume", new { deviceToken = phoneCredential })).Status == HttpStatusCode.Unauthorized &&
+            (await client.Post("/api/resume", new { deviceToken = windowsCredential })).Status == HttpStatusCode.Unauthorized &&
+            !File.Exists(legacyPath), mode + ": forget all revokes both legacy and additional credentials");
+    }
+
+    for (int index = 0; index < LocalIdentity.MaximumDevices; index++)
+        identity.AddDevice(new SavedDevice(index.ToString("X64"), IPAddress.Loopback.ToString(), address.ToString()));
+    bool capped = false;
+    try { identity.AddDevice(new SavedDevice(new string('F', 64), IPAddress.Loopback.ToString(), address.ToString())); }
+    catch (IOException) { capped = true; }
+    Check(capped && identity.LoadDevices().Count == LocalIdentity.MaximumDevices,
+        mode + ": enrollment capacity limit preserves every existing record");
+}
 
 static void Check(bool success, string name)
 {
