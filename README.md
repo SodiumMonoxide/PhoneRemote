@@ -2,7 +2,7 @@
 
 在安卓手机或另一台 Windows 电脑上查看 Windows 桌面，并操作鼠标、常用按键和文字输入。同一个可信局域网可以直接连接，异地可通过两端的 Tailscale 连接。两种方式分别保存配对。
 
-本次版本：**Windows 2.5.0 + Android 2.3.0**。Windows 控制端支持直接键鼠、纯画面全屏及可拖动的顶部折叠工具栏。两台 Windows 均升级至 2.5.0 后使用新键盘功能；手机不必升级或重新配对。尚无第二台实体设备，真实双 Windows 遥控和跨 Wi-Fi 测试待完成。
+本次版本：**Windows 2.5.0 + Android 2.3.0**。Windows 控制端支持直接键鼠、纯画面全屏及可拖动的顶部折叠工具栏。两台 Windows 均升级至 2.5.0 后使用新键盘功能；手机不必升级或重新配对。已用 Windows 沙盒实测鼠标、工具栏退出全屏及本机文本粘贴；实体键盘捕获、真实退出快捷键和双 Windows 跨 Wi-Fi 仍待验证，详见[虚拟机验证记录](docs/Windows虚拟机验证.md)。
 
 ## 下载和安装
 
@@ -51,6 +51,7 @@ Windows 提供两种操作：
 
 - [连接、切换、后台运行和故障排查](docs/使用指南.md)
 - [Windows 电脑控制 Windows 电脑](docs/Windows电脑遥控指南.md)
+- [Windows 虚拟机验证结果与覆盖范围](docs/Windows虚拟机验证.md)
 - [从源码构建和签名](docs/构建说明.md)
 - [版本变更](CHANGELOG.md)
 - [安全说明](SECURITY.md)
