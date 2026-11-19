@@ -3,6 +3,12 @@ using System.Reflection;
 
 namespace RemoteControl;
 
+internal sealed class WindowsClientForm : Form
+{
+    internal bool ShutdownCalled { get; private set; }
+    public Task ShutdownAsync() { ShutdownCalled = true; Close(); return Task.CompletedTask; }
+}
+
 internal sealed record ServerStatus(string? Code, DateTimeOffset? CodeExpiresAt, bool Connected, bool RememberedDevice);
 internal sealed class RemoteControlSession
 {
@@ -76,7 +82,7 @@ internal static class Program
         await Task.Delay(600);
         var icon = Field<NotifyIcon>(host, "_tray");
         var menu = Field<ContextMenuStrip>(host, "_trayMenu");
-        Check(icon.Visible && (icon.Text ?? "").Contains("局域网：手机已连接") && !(icon.Text ?? "").Contains("12345678"), "Safe accurate tray tooltip");
+        Check(icon.Visible && (icon.Text ?? "").Contains("局域网：设备已连接") && !(icon.Text ?? "").Contains("12345678"), "Safe accurate tray tooltip");
         Check(menu.Items.OfType<ToolStripMenuItem>().Any(i => i.Text == "Tailscale · 运行中，等待配对"), "Independent Tailscale tray state");
 
         await CloseWithChoice(host, "取消", capture: true);
@@ -87,7 +93,7 @@ internal static class Program
         RemoteServer.Active[false].Disconnect();
         RemoteServer.Active[true].Pair();
         await Task.Delay(650);
-        Check((icon.Text ?? "").Contains("局域网：已配对，等待连接") && (icon.Text ?? "").Contains("Tailscale：手机已连接"), "Hidden status timer updates both modes");
+        Check((icon.Text ?? "").Contains("局域网：已配对，等待连接") && (icon.Text ?? "").Contains("Tailscale：设备已连接"), "Hidden status timer updates both modes");
         host.RestoreWindow();
         Check(host.Visible && host.ShowInTaskbar, "External-launch restoration");
         Button(host, "后台运行").PerformClick();
@@ -99,6 +105,10 @@ internal static class Program
         host.RestoreWindow();
         Check(host.WindowState == FormWindowState.Normal, "Restore minimized window");
         Capture(host, "host-preview.png");
+        Button(host, "控制另一台电脑").PerformClick();
+        var clientWindow = Field<WindowsClientForm>(host, "_clientWindow");
+        Button(host, "控制另一台电脑").PerformClick();
+        Check(ReferenceEquals(clientWindow, Field<WindowsClientForm>(host, "_clientWindow")), "Client window reused");
         var disposed = Closed(host);
         RemoteServer.Stopping = new TaskCompletionSource();
         await CloseWithChoice(host, "退出应用");
@@ -107,6 +117,7 @@ internal static class Program
         await disposed.WaitAsync(TimeSpan.FromSeconds(3));
         RemoteServer.Stopping = null;
         Check(RemoteServer.Active.Count == 0 && host.IsDisposed && !icon.Visible, "Exit releases both servers and tray");
+        Check(clientWindow.ShutdownCalled && clientWindow.IsDisposed, "Exit disconnects and closes Windows controller");
         using var noServices = NewHost();
         var noServicesClosed = Closed(noServices);
         Button(noServices, "退出应用").PerformClick();
