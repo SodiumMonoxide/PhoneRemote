@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Compile Include="../session/ConnectionAddress.cs" Link="ConnectionAddress.cs" />
+    <Compile Include="../../windows/RemoteServer.cs" />
+    <Compile Include="../../windows/RemoteControlSession.cs" />
+    <Compile Include="../../windows/Desktop.cs" />
+    <Compile Include="../../windows/LocalIdentity.cs" />
+    <Compile Include="../../windows/WindowsRemoteClient.cs" />
+    <Compile Include="../../windows/WindowsClientProfiles.cs" />
+    <EmbeddedResource Include="../../windows/Web/index.html" LogicalName="Web.index.html" />
+    <EmbeddedResource Include="../../windows/Web/styles.css" LogicalName="Web.styles.css" />
+    <EmbeddedResource Include="../../windows/Web/app.js" LogicalName="Web.app.js" />
+  </ItemGroup>
+</Project>
