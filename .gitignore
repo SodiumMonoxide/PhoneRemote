@@ -28,6 +28,7 @@ artifacts/
 *.dpapi
 **/password*.txt
 **/device-*.json
+**/devices-additional-*.json
 local.properties
 .env
 .env.*
