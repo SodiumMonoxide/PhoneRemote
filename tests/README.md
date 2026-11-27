@@ -33,3 +33,7 @@ Windows 控制端相关检查：
 这些检查不能代替第二台实体 Windows 电脑的鼠标键盘实测、双机 DPI 差异、网络延迟、真实防火墙或跨 Wi-Fi 检查。人工验收步骤见 [双 Windows 指南](../docs/Windows电脑遥控指南.md)。
 
 网络测试共用回环端口 8443，应逐组运行，避免互相占用端口。
+
+桌面和窄屏控制页的回归脚本位于 `tests/web/desktop.py`。安装 Python Playwright 后，运行 `python tests/web/desktop.py <Chromium浏览器可执行文件>`。它在隔离页面用模拟传输验证画面比例、坐标输入、键盘、焦点退出和触屏配对流程。
+
+运行 `dotnet run --project tests/mac-input/MacInputCheck.csproj -c Release` 可用内存中的 Quartz 替身核对 Mac 输入映射、释放顺序和 Unicode 文字处理。在 Mac 上首次启动被控服务时，另行验证权限提示、屏幕画面、真实输入与断开。

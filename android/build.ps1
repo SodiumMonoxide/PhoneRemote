@@ -81,8 +81,8 @@ try {
     $style = [IO.File]::ReadAllText((Join-Path $web 'styles.css')).Replace("`r`n", "`n")
     $page = [IO.File]::ReadAllText((Join-Path $web 'index.html'))
     if ($script -match '</script' -or $style -match '</style') { throw 'Page assets cannot be inlined.' }
-    $externalScript = '<script src="/app.js" defer></script>'
-    $externalStyle = '<link rel="stylesheet" href="/styles.css">'
+    $externalScript = '<script src="app.js" defer></script>'
+    $externalStyle = '<link rel="stylesheet" href="styles.css">'
     if (-not ($page.Contains($externalScript) -and $page.Contains($externalStyle) -and $page.Contains('</body>'))) {
         throw 'Web page asset references changed.'
     }

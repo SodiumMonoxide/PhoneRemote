@@ -11,8 +11,20 @@ internal sealed record ConnectionAddress(IPAddress Address, int PrefixLength, bo
     private const string TailscaleAdapterDescription = "Tailscale Tunnel";
     private static readonly IPNetwork TailscaleRange = IPNetwork.Parse("100.64.0.0/10");
 
-    public static IReadOnlyList<ConnectionAddress> Find() =>
-        NetworkInterface.GetAllNetworkInterfaces()
+    public static IReadOnlyList<ConnectionAddress> Find()
+    {
+#if PHONEREMOTE_MAC
+        IPAddress? tailAddress = MacNetwork.GetTailscaleAddress();
+        return NetworkInterface.GetAllNetworkInterfaces()
+            .SelectMany(adapter => adapter.GetIPProperties().UnicastAddresses
+                .Select(entry => new { Adapter = adapter, Entry = entry, Tail = entry.Address.Equals(tailAddress) }))
+            .Where(item => item.Tail || item.Adapter.OperationalStatus == OperationalStatus.Up)
+            .Where(item => IsUsableAddress(item.Entry, item.Tail))
+            .Select(item => new ConnectionAddress(item.Entry.Address, item.Entry.PrefixLength, item.Tail))
+            .DistinctBy(item => item.Address)
+            .ToArray();
+#else
+        return NetworkInterface.GetAllNetworkInterfaces()
             .Where(adapter => adapter.OperationalStatus == OperationalStatus.Up)
             .Select(adapter => new
             {
@@ -29,6 +41,8 @@ internal sealed record ConnectionAddress(IPAddress Address, int PrefixLength, bo
                 .Select(entry => new ConnectionAddress(entry.Address, entry.PrefixLength, adapter.Tailscale)))
             .DistinctBy(entry => entry.Address)
             .ToArray();
+#endif
+    }
 
     public bool AllowsPeer(IPAddress peer)
     {
@@ -54,7 +68,9 @@ internal sealed record ConnectionAddress(IPAddress Address, int PrefixLength, bo
         string.Equals(adapter.Description, TailscaleAdapterDescription, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsUsableAddress(UnicastIPAddressInformation entry, bool tailscale) =>
+#if !PHONEREMOTE_MAC
         entry.DuplicateAddressDetectionState == DuplicateAddressDetectionState.Preferred &&
+#endif
         (tailscale
             ? entry.PrefixLength is > 0 and <= 32 && IsTailscaleIPv4(entry.Address)
             : entry.PrefixLength is > 0 and < 32 && IsPrivateIPv4(entry.Address));

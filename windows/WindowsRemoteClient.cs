@@ -95,7 +95,7 @@ internal sealed class WindowsRemoteClient : IDisposable
 
     internal async Task RequireKeyboardSupportAsync(CancellationToken cancellationToken = default)
     {
-        const string message = "被控电脑需要升级到 Windows 2.5.0 或更新版本，才能使用直接键鼠控制。原有配对可以保留。";
+        const string message = "被控电脑缺少直接键鼠支持。请更新被控端的 PhoneRemote。Windows 需要 2.5.0 或更新版本。";
         try
         {
             byte[] bytes = await RequestAsync(HttpMethod.Get, "/api/capabilities", null, true, cancellationToken);

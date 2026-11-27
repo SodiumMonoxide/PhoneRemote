@@ -25,6 +25,7 @@ const modeButtons = [...document.querySelectorAll("[data-mode]")];
 const modeHelp = document.querySelector("#mode-help");
 
 const modeInstructions = {
+  direct: "点击画面后可直接使用鼠标、键盘输入和滚动。Esc 返回操作面板。中文输入可用「输入文字」。",
   click: "轻点画面中的位置。",
   doubleClick: "轻点画面，电脑会在对应位置双击。",
   rightClick: "轻点画面，电脑会在对应位置按右键。",
@@ -33,7 +34,10 @@ const modeInstructions = {
 };
 
 const androidBridge = window.AndroidBridge ?? null;
-const frameInterval = androidBridge ? 450 : 240;
+const desktopControl = !androidBridge && (window.PhoneRemoteMac || matchMedia("(any-pointer: fine)").matches);
+const frameInterval = androidBridge ? 450 : desktopControl ? 150 : 240;
+const directButton = document.querySelector("#direct-mode");
+directButton.hidden = !desktopControl;
 const pendingAndroidRequests = new Map();
 let androidRequestId = 0;
 let current = null;
@@ -53,6 +57,7 @@ function showStatus(state, label) {
 }
 
 async function request(path, { token, body, keepalive = false, timeout = 3500 } = {}) {
+  if (window.PhoneRemoteMac) return window.PhoneRemoteMac.request(path, { token, body, timeout, keepalive });
   if (androidBridge) return requestAndroid(path, token, body, timeout);
   const headers = new Headers();
   if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -132,7 +137,9 @@ function setConnecting(busy) {
 }
 
 function selectMode(next) {
+  if (current?.gesture) finishGesture(current, null, true);
   mode = next;
+  screenImage.tabIndex = next === "direct" ? 0 : -1;
   modeHelp.textContent = modeInstructions[next];
   for (const button of modeButtons) {
     button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
@@ -151,6 +158,7 @@ function discardPending(session, preserveRelease = false) {
 }
 
 function setFrameReady(session, ready, message = "") {
+  if (ready && session.ready) return;
   session.ready = ready;
   viewport.dataset.ready = String(ready);
   frameMessage.hidden = ready;
@@ -194,6 +202,7 @@ function openSession(token) {
     gesture: null,
     frameUrl: null,
     frameTimer: null,
+    scrollRemainder: 0,
     readingFrame: false,
     disconnecting: false
   };
@@ -205,7 +214,7 @@ function openSession(token) {
   inputMessage.textContent = "";
   textInput.value = "";
   textSubmit.disabled = false;
-  selectMode("click");
+  selectMode(desktopControl ? "direct" : "click");
   setFrameReady(session, false, "正在获取画面…");
   void readFrame(session);
 }
@@ -242,7 +251,7 @@ pairForm.addEventListener("submit", async event => {
         pairMessage.textContent = "配对码错误或已过期，请查看电脑端窗口。";
         break;
       case 409:
-        pairMessage.textContent = "已有手机连接或已保存配对，请在电脑端检查。";
+        pairMessage.textContent = "请在被控端检查当前会话和已配对设备，再生成新码。";
         break;
       case 429:
         pairMessage.textContent = "尝试次数过多，请稍后重试。";
@@ -256,7 +265,7 @@ pairForm.addEventListener("submit", async event => {
   } catch {
     pairMessage.textContent = androidBridge
       ? "无法连接。请核对连接设置，并查看「使用指南」中的连接排查。"
-      : "无法连接，请确认电脑端程序已开启，且手机能访问所填地址。";
+      : "无法连接，请确认被控端已启动，并核对地址和证书指纹。";
   } finally {
     setConnecting(false);
     if (!current) showStatus("offline", "未连接");
@@ -349,9 +358,17 @@ function queueInput(session, data, complete) {
   const tail = session.queue[session.queue.length - 1];
   if (data.action === "move" && tail?.data.action === "move") {
     tail.data = data;
-  } else if (session.queue.length < 12 || data.action === "up") {
+  } else if (data.action === "scroll" && tail?.data.action === "scroll" &&
+             data.x === tail.data.x && data.y === tail.data.y && Math.abs(data.delta + tail.data.delta) <= 8) {
+    tail.data.delta += data.delta;
+    if (tail.data.delta === 0) session.queue.pop();
+  } else if (!complete && !tail?.complete && data.action === "text" && tail?.data.action === "text" &&
+             data.text.length + tail.data.text.length <= 256) {
+    tail.data.text += data.text;
+  } else if (session.queue.length < 48 || data.action === "up") {
     session.queue.push({ data, complete });
   } else {
+    if (data.action !== "move") inputMessage.textContent = "网络较慢，操作尚未发送，请稍后重试。";
     complete?.(false);
     return;
   }
@@ -407,7 +424,7 @@ function finishGesture(session, event, cancelled) {
     screenImage.releasePointerCapture(gesture.id);
   }
   const point = (event && !cancelled && screenPoint(event)) || gesture.point;
-  if (gesture.mode === "drag") {
+  if (gesture.mode === "drag" || gesture.mode === "direct") {
     queueInput(session, { action: "up", ...point });
   } else if (!cancelled && gesture.mode !== "move" && !gesture.moved) {
     const distance = Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY);
@@ -417,10 +434,18 @@ function finishGesture(session, event, cancelled) {
 
 screenImage.addEventListener("pointerdown", event => {
   const session = current;
-  if (!session?.ready || session.gesture || !event.isPrimary || event.button !== 0) return;
+  if (!session?.ready || session.gesture || !event.isPrimary) return;
   const point = screenPoint(event);
   if (!point) return;
+  if (mode === "direct" && (event.button === 2 || (event.button === 0 && event.ctrlKey && window.PhoneRemoteMac))) {
+    event.preventDefault();
+    screenImage.focus({ preventScroll: true });
+    queueInput(session, { action: "rightClick", ...point });
+    return;
+  }
+  if (event.button !== 0) return;
   event.preventDefault();
+  if (mode === "direct") screenImage.focus({ preventScroll: true });
   screenImage.setPointerCapture(event.pointerId);
   const gesture = {
     id: event.pointerId,
@@ -433,7 +458,7 @@ screenImage.addEventListener("pointerdown", event => {
   };
   session.gesture = gesture;
   if (mode === "move") queueInput(session, { action: "move", ...point });
-  if (mode === "drag") {
+  if (mode === "drag" || mode === "direct") {
     queueInput(session, { action: "down", ...point });
     gesture.keepHeld = setInterval(() => {
       queueInput(session, { action: "move", ...gesture.point });
@@ -444,6 +469,11 @@ screenImage.addEventListener("pointerdown", event => {
 screenImage.addEventListener("pointermove", event => {
   const session = current;
   const gesture = session?.gesture;
+  if (session?.ready && !gesture && mode === "direct" && event.pointerType === "mouse") {
+    const point = screenPoint(event);
+    if (point) queueInput(session, { action: "move", ...point });
+    return;
+  }
   if (!session?.ready || !gesture || gesture.id !== event.pointerId) return;
   const point = screenPoint(event);
   if (!point) return;
@@ -451,7 +481,7 @@ screenImage.addEventListener("pointermove", event => {
   if (Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) >= 10) {
     gesture.moved = true;
   }
-  if (gesture.mode === "move" || gesture.mode === "drag") {
+  if (gesture.mode === "move" || gesture.mode === "drag" || gesture.mode === "direct") {
     queueInput(session, { action: "move", ...point });
   }
 });
@@ -469,8 +499,47 @@ screenImage.addEventListener("contextmenu", event => event.preventDefault());
 screenImage.addEventListener("wheel", event => {
   if (!current?.ready || event.deltaY === 0) return;
   event.preventDefault();
-  queueInput(current, { action: "scroll", delta: -Math.sign(event.deltaY) });
+  let delta = -Math.sign(event.deltaY);
+  if (mode === "direct") {
+    // Trackpads report many small pixel deltas. Keep fractions between events.
+    const units = event.deltaMode === 1 ? 1 : event.deltaMode === 2 ? 8 : 1 / 40;
+    current.scrollRemainder -= event.deltaY * units;
+    const lines = Math.trunc(current.scrollRemainder);
+    if (!lines) return;
+    current.scrollRemainder -= lines;
+    delta = Math.max(-8, Math.min(8, lines));
+  }
+  queueInput(current, { action: "scroll", delta, ...screenPoint(event) });
 }, { passive: false });
+
+const remoteKeys = new Set([...keyControls.querySelectorAll("[data-key]")].map(button => button.dataset.key));
+screenImage.addEventListener("keydown", event => {
+  if (!current?.ready || mode !== "direct" || event.isComposing) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    directButton.focus();
+    return;
+  }
+  let key = event.key === " " ? "Space" : event.key;
+  let input;
+  if (event.metaKey || event.ctrlKey || event.altKey) {
+    if (event.altKey && key === "Tab") key = "Alt+Tab";
+    else if (!event.altKey && (event.ctrlKey || event.metaKey)) key = "Ctrl+" + key.toUpperCase();
+    else return;
+    if (!remoteKeys.has(key)) return;
+    input = { action: "key", key };
+  } else if ([...event.key].length === 1) {
+    input = { action: "text", text: event.key };
+  } else if (remoteKeys.has(key)) {
+    input = { action: "key", key };
+  } else return;
+  event.preventDefault();
+  queueInput(current, input);
+});
+
+window.addEventListener("blur", () => {
+  if (current?.gesture) finishGesture(current, null, true);
+});
 
 mouseControls.addEventListener("click", event => {
   if (!current?.ready) return;

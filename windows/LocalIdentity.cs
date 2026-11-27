@@ -93,11 +93,19 @@ internal sealed class LocalIdentity(string directory, ConnectionAddress endpoint
 
     public X509Certificate2 LoadCertificate()
     {
+#if PHONEREMOTE_MAC
+        string path = Path.Combine(directory, $"https-{endpoint.Address}.p12");
+#else
         string path = Path.Combine(directory, $"https-{endpoint.Address}.dpapi");
+#endif
         if (File.Exists(path))
         {
+#if PHONEREMOTE_MAC
+            byte[] pfx = File.ReadAllBytes(path);
+#else
             byte[] encrypted = File.ReadAllBytes(path);
             byte[] pfx = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
+#endif
             try
             {
                 var existing = Import(pfx);
@@ -130,7 +138,11 @@ internal sealed class LocalIdentity(string directory, ConnectionAddress endpoint
             var cert = Import(newPfx);
             try
             {
+#if PHONEREMOTE_MAC
+                WriteAtomically(path, newPfx);
+#else
                 WriteAtomically(path, ProtectedData.Protect(newPfx, null, DataProtectionScope.CurrentUser));
+#endif
                 return cert;
             }
             catch
@@ -150,11 +162,25 @@ internal sealed class LocalIdentity(string directory, ConnectionAddress endpoint
 
     private void WriteAtomically(string path, byte[] data)
     {
+#if PHONEREMOTE_MAC
+        if (!OperatingSystem.IsMacOS()) throw new PlatformNotSupportedException();
+        Directory.CreateDirectory(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+#else
         Directory.CreateDirectory(directory);
+#endif
         string temp = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
+#if PHONEREMOTE_MAC
+            using (var output = new FileStream(temp, new FileStreamOptions
+            {
+                Access = FileAccess.Write, Mode = FileMode.CreateNew, Share = FileShare.None,
+                UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+            }))
+                output.Write(data);
+#else
             File.WriteAllBytes(temp, data);
+#endif
             File.Move(temp, path, overwrite: true);
         }
         finally

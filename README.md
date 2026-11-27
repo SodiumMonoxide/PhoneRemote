@@ -1,25 +1,35 @@
-# PhoneRemote · 手机和电脑遥控 Windows
+# PhoneRemote · Mac 与 Windows 远程控制
 
-在安卓手机或另一台 Windows 电脑上查看 Windows 桌面，并操作鼠标、常用按键和文字输入。同一个可信局域网可以直接连接，异地可通过两端的 Tailscale 连接。两种方式分别保存配对。
+PhoneRemote 2.6.0 支持 Mac 控制 Windows、Windows 控制 Mac、两台 Mac 互控，以及原有的 Windows 互控和 Android 控制 Windows。同一可信局域网可直连，异地可通过两端的 Tailscale 连接。
 
-本次版本：**Windows 2.5.0 + Android 2.3.0**。Windows 控制端支持直接键鼠、纯画面全屏及可拖动的顶部折叠工具栏。两台 Windows 均升级至 2.5.0 后使用新键盘功能；手机不必升级或重新配对。已用 Windows 沙盒实测鼠标、工具栏退出全屏及本机文本粘贴；实体键盘捕获、真实退出快捷键和双 Windows 跨 Wi-Fi 仍待验证，详见[虚拟机验证记录](docs/Windows虚拟机验证.md)。
+Windows 和 Mac 版均为 **2.6.0**。Android 继续使用 **2.3.0**，现有手机可沿用原配对。本次已在 Windows 验证协议、客户端和控制页面。Mac 主控的 AppKit 界面、被控端的系统授权与双机键鼠仍待 Mac 实机验证。
 
 ## 下载和安装
 
-在本仓库的 **Releases** 页面下载：
+本地 2.6.0 构建提供以下文件。此前发布的 Windows 和 Android 版本可在仓库的 Releases 页面找到。
 
-- `PhoneRemote-v2.5.0-Windows-x64.zip`：Windows 便携版，完整解压到固定目录后运行 `PhoneRemote.exe`，同时包含控制端和被控端。
-- `PhoneRemote-v2.3.0-Android.apk`：安卓客户端，在手机上安装。覆盖升级须使用相同签名的安装包。
-- `PhoneRemote-v2.5.0-SHA256.txt`：新版 Windows 包与源码的下载校验值。
+- `PhoneRemote-v2.6.0-Windows-x64.zip` 为 Windows 便携版。完整解压到固定目录后运行 `PhoneRemote.exe`，同时包含控制端和被控端。
+- `PhoneRemote-v2.6.0-macOS-Apple-Silicon.zip` 和 `PhoneRemote-v2.6.0-macOS-Intel.zip` 分别适用于 Apple 芯片和 Intel 芯片的 Mac，最低部署版本为 macOS 14。解压后将 `PhoneRemote.app` 拖入「应用程序」，已内置控制端、被控端和运行时。当前为本地签名构建，尚未经过 Apple 公证。
 
-当前支持 Windows 11 x64、Android 10 及以上。Windows 包自带运行时。电脑须开机、联网、用户桌面可用，遥控服务须已启动。锁屏、休眠或 UAC 安全桌面期间不提供普通桌面遥控。Windows EXE 尚未进行 Authenticode 签名。
+安卓手机可继续使用已发布的 `PhoneRemote-v2.3.0-Android.apk`。
+
+Windows 版适用于 Windows 11 x64，Android 版需要 Android 10 及以上。Windows 包自带运行时。被控电脑须开机、联网、用户桌面已解锁，且已启动遥控服务。Windows EXE 尚未进行 Authenticode 签名。
 
 ## 第一次连接
 
+### Mac 与 Windows 互控、两台 Mac 互控
+
+1. 在**被控电脑**启动共享。Windows 选择网络地址并点「启动连接」。Mac 点「打开被控服务」，在终端选择地址，按系统提示授予屏幕录制和辅助功能权限。
+2. 在被控电脑复制 HTTPS 地址和证书指纹。Windows 点「复制连接信息」，Mac 在服务终端输入 `c` 再回车。将这两行交给控制电脑。
+3. 在**控制电脑**打开 PhoneRemote。Windows 点「控制 Windows 或 Mac」，Mac 使用首页「控制另一台电脑」。粘贴连接信息并核对，在配对页输入被控端显示的 8 位码。
+4. 在 Mac 控制端点击远程画面即可使用鼠标、常用按键和键盘文字输入。Esc 把焦点移回操作面板。输入中文或较长文本可展开「输入文字」。Mac 主控每次建立新会话都需要配对码，被控 Mac 可在终端输入 `n` 生成新码。
+
+Windows 键盘控制 Mac 时，Windows 徽标键对应 Command，Alt 对应 Option。完整的安装、断开和系统授权步骤见 [Mac 互控指南](docs/Mac互控指南.md)。
+
 ### Windows 控制 Windows
 
-1. 两台电脑均运行 Windows 2.5.0 版。被控电脑在主界面选择局域网或 Tailscale 并启动连接。
-2. 被控电脑点「复制连接信息」。控制电脑点「控制另一台电脑」，选择对应模式，点「粘贴连接信息」并核对两项内容。
+1. 两台电脑均运行 Windows 版。被控电脑在主界面选择局域网或 Tailscale 并启动连接。
+2. 被控电脑点「复制连接信息」。控制电脑点「控制 Windows 或 Mac」，选择对应模式，点「粘贴连接信息」并核对两项内容。
 3. 填写被控电脑显示的配对码后连接。若已经配对手机，先结束当前会话，再点「生成新码」添加电脑；原手机配对会保留。
 4. 配对后直接使用鼠标和键盘操作。展开顶部工具栏可全屏、退出键鼠控制或准备粘贴本机文本；拖动栏头可改变位置。记住后可直接重连，两种模式独立保存。
 
@@ -63,6 +73,7 @@ Windows 提供两种操作：
 
 ```text
 windows/       Windows Forms 界面、HTTPS 服务、输入控制和 Web 页面
+macos/         AppKit 控制端、Mac 主机和 ScreenCaptureKit / Quartz 适配
 android/       原生 Android 客户端与 HTTPS 证书指纹校验
 scripts/       Windows 构建脚本
 docs/          安装、连接和构建文档

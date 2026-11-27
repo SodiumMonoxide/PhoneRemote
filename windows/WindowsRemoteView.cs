@@ -5,6 +5,7 @@ namespace RemoteControl;
 internal sealed class WindowsRemoteView : Control
 {
     private Image? frame;
+    private string emptyMessage = "连接后在这里显示远程电脑画面";
     public event Action<ControlInput>? RemoteInput;
     public event Action? ExitControlRequested;
     public event Action<string>? KeyboardCaptureFailed;
@@ -52,7 +53,7 @@ internal sealed class WindowsRemoteView : Control
             PostToView(() => CaptureLost?.Invoke());
         });
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
-            ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable |
+            ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable | ControlStyles.ResizeRedraw |
             ControlStyles.StandardClick | ControlStyles.StandardDoubleClick, true);
         clickTimer.Interval = SystemInformation.DoubleClickTime;
         clickTimer.Tick += (_, _) => FlushClick();
@@ -121,12 +122,13 @@ internal sealed class WindowsRemoteView : Control
         Invalidate();
     }
 
-    public void ClearFrame()
+    public void ClearFrame(string message = "连接后在这里显示远程电脑画面")
     {
         ReleaseAllInput();
         clickTimer.Stop(); pendingClick = null; wheelRemainder = 0;
         frame?.Dispose();
         frame = null;
+        emptyMessage = message;
         Invalidate();
     }
 
@@ -155,11 +157,17 @@ internal sealed class WindowsRemoteView : Control
         base.OnPaint(e);
         if (frame is not null)
         {
-            e.Graphics.InterpolationMode = InterpolationMode.HighQualityBilinear;
-            e.Graphics.DrawImage(frame, FitRectangle(ClientSize, frame.Size));
+            var bounds = FitRectangle(ClientSize, frame.Size);
+            if (bounds.Size == frame.Size)
+                e.Graphics.DrawImageUnscaled(frame, bounds.Location);
+            else
+            {
+                e.Graphics.InterpolationMode = InterpolationMode.Bilinear;
+                e.Graphics.DrawImage(frame, bounds);
+            }
         }
         else
-            TextRenderer.DrawText(e.Graphics, "连接后在这里显示远程电脑画面", Font, ClientRectangle,
+            TextRenderer.DrawText(e.Graphics, emptyMessage, Font, ClientRectangle,
                 Color.FromArgb(190, 204, 216), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         if (Focused)
             ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -3, -3), Color.White, BackColor);

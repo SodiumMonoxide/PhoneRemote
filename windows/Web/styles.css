@@ -195,3 +195,21 @@ textarea { min-height: 88px; resize: vertical; }
   margin-top: .65rem;
 }
 
+@media (min-width: 900px) {
+  main, .topbar-content { max-width: 1800px; padding-inline: clamp(16px, 2vw, 36px); }
+  #remote-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(238px, 21vw, 308px);
+    align-items: start;
+    gap: 16px;
+  }
+  .viewport { height: calc(100vh - 98px); height: calc(100dvh - 98px); min-height: 220px; }
+  .screen { max-height: 100%; min-height: 0; min-width: 0; }
+  .viewport { grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
+  .controls { width: 100%; margin: 0; max-height: calc(100dvh - 98px); overflow: auto; }
+  .modes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .key-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.screen:focus-visible { outline-offset: -3px; }
+.mode-help { line-height: 1.5; }
+

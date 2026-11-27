@@ -16,6 +16,7 @@ $runtimeVersion = '10.0.15'
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)." }
 
 Copy-Item -LiteralPath (Join-Path $repo 'docs/使用指南.md') -Destination (Join-Path $output '使用指南.md') -Force
+Copy-Item -LiteralPath (Join-Path $repo 'docs/Mac互控指南.md') -Destination (Join-Path $output 'Mac互控指南.md') -Force
 Copy-Item -LiteralPath (Join-Path $repo 'docs/Windows电脑遥控指南.md') -Destination (Join-Path $output 'Windows电脑遥控指南.md') -Force
 Copy-Item -LiteralPath (Join-Path $repo 'CHANGELOG.md') -Destination (Join-Path $output '版本说明.md') -Force
 $notices = Join-Path $output 'Runtime Notices'

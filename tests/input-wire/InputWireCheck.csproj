@@ -11,6 +11,7 @@
     <Compile Include="../session/ConnectionAddress.cs" Link="ConnectionAddress.cs" />
     <Compile Include="../../windows/RemoteServer.cs" />
     <Compile Include="../../windows/RemoteControlSession.cs" />
+    <Compile Include="../../windows/ControlInput.cs" />
     <Compile Include="../../windows/Desktop.cs" />
     <Compile Include="../../windows/LocalIdentity.cs" />
     <Compile Include="../../windows/WindowsRemoteClient.cs" />

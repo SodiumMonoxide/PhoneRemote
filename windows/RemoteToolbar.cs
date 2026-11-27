@@ -6,7 +6,7 @@ internal sealed class RemoteToolbar : Panel
     private readonly Label handle = new() { Text = "⋮⋮  遥控工具  ▾", TextAlign = ContentAlignment.MiddleCenter,
         Dock = DockStyle.Top, Height = 30, Cursor = Cursors.SizeAll, AccessibleName = "拖动或展开遥控工具栏" };
     private readonly FlowLayoutPanel menu = new() { FlowDirection = FlowDirection.TopDown,
-        WrapContents = false, Dock = DockStyle.Fill, Padding = new Padding(8), Visible = false };
+        WrapContents = false, Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(8), Visible = false };
     private readonly Label state = new() { AutoSize = false, Height = 44, Width = 244 };
     private readonly Button control = MakeButton("退出键鼠控制");
     private readonly Button text = MakeButton("准备粘贴本机文本");
@@ -75,6 +75,7 @@ internal sealed class RemoteToolbar : Panel
         handle.MouseLeave += (_, _) => collapseTimer.Start();
         collapseTimer.Tick += (_, _) =>
         {
+            if (!expanded) { collapseTimer.Stop(); return; }
             if (!Editing && !dragging && !ContainsFocus && !ClientRectangle.Contains(PointToClient(Cursor.Position)))
                 SetExpanded(false);
         };
@@ -98,8 +99,7 @@ internal sealed class RemoteToolbar : Panel
         if (value) Opening?.Invoke();
         expanded = value;
         menu.Visible = value;
-        Height = value ? Scale(324) : Scale(32);
-        ClampToParent();
+        PlaceInitially();
         BringToFront();
         if (!value) { collapseTimer.Stop(); InteractionEnded?.Invoke(); }
     }
@@ -107,9 +107,10 @@ internal sealed class RemoteToolbar : Panel
     internal void PlaceInitially()
     {
         if (Parent is null) return;
+        Size = new Size(Math.Min(Scale(270), Parent.ClientSize.Width),
+            Math.Min(Scale(expanded ? 324 : 32), Parent.ClientSize.Height));
         if (!placed)
         {
-            Width = Math.Min(Scale(270), Parent.ClientSize.Width);
             Location = new Point(Math.Max(0, (Parent.ClientSize.Width - Width) / 2), 0);
         }
         ClampToParent();

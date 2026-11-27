@@ -105,9 +105,9 @@ internal static class Program
         host.RestoreWindow();
         Check(host.WindowState == FormWindowState.Normal, "Restore minimized window");
         Capture(host, "host-preview.png");
-        Button(host, "控制另一台电脑").PerformClick();
+        Button(host, "控制 Windows 或 Mac").PerformClick();
         var clientWindow = Field<WindowsClientForm>(host, "_clientWindow");
-        Button(host, "控制另一台电脑").PerformClick();
+        Button(host, "控制 Windows 或 Mac").PerformClick();
         Check(ReferenceEquals(clientWindow, Field<WindowsClientForm>(host, "_clientWindow")), "Client window reused");
         var disposed = Closed(host);
         RemoteServer.Stopping = new TaskCompletionSource();
@@ -169,6 +169,9 @@ internal static class Program
             Console.WriteLine($"Layout check: actual DPI {host.DeviceDpi}, scale {scale}, minimum size {host.Size}");
             var background = Button(host, "后台运行");
             var exit = Button(host, "退出应用");
+            var controlComputer = Button(host, "控制 Windows 或 Mac");
+            Check(controlComputer.Left >= 0 && controlComputer.Right <= controlComputer.Parent!.ClientSize.Width,
+                $"Computer control shortcut fits at scale {scale}");
             Check(background.Bounds.Right <= background.Parent!.ClientSize.Width && exit.Bounds.Right <= exit.Parent!.ClientSize.Width,
                 $"Footer buttons fit at scale {scale}");
             Check(exit.Parent!.Bounds.Right <= exit.Parent.Parent!.ClientSize.Width, $"Footer actions fit at scale {scale}");

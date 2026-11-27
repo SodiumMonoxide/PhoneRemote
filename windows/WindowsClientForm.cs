@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 namespace RemoteControl;
@@ -12,8 +13,10 @@ internal sealed class WindowsClientForm : Form
     private readonly CheckBox remember = new() { Text = "记住此电脑", Checked = true, AutoSize = true };
     private readonly Button connect = MakeButton("连接"), disconnect = MakeButton("断开"), paste = MakeButton("粘贴连接信息"),
         forget = MakeButton("清除本机保存"), fullscreen = MakeButton("全屏预览");
-    private readonly Label status = new() { AccessibleName = "Windows 控制端连接状态", AutoSize = false };
-    private readonly Panel setup = new() { Dock = DockStyle.Top, Height = 260, BackColor = Color.White };
+    private readonly Label status = new() { AccessibleName = "控制端连接状态", AutoSize = true,
+        Anchor = AnchorStyles.Left | AnchorStyles.Right, ForeColor = Color.FromArgb(66, 89, 101) };
+    private readonly TableLayoutPanel setup = new() { Dock = DockStyle.Top, ColumnCount = 2, AutoSize = true,
+        AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Color.White, Padding = new Padding(18, 10, 18, 10) };
     private readonly WindowsRemoteView view = new() { Dock = DockStyle.Fill };
     private readonly RemoteToolbar tools = new() { Visible = false };
     private WindowsRemoteClient? client;
@@ -31,19 +34,33 @@ internal sealed class WindowsClientForm : Form
         profiles = new WindowsClientProfiles(profilePath);
         Text = "PhoneRemote · 控制另一台电脑"; Font = new Font("Microsoft YaHei UI", 10F);
         BackColor = Color.White; ForeColor = Color.FromArgb(27, 43, 60); AutoScaleMode = AutoScaleMode.Dpi;
-        StartPosition = FormStartPosition.CenterScreen; ClientSize = new Size(1080, 800); MinimumSize = new Size(750, 600);
-        setup.Width = ClientSize.Width;
+        StartPosition = FormStartPosition.CenterScreen; ClientSize = new Size(960, 680); MinimumSize = new Size(650, 475);
         mode.Items.AddRange(["局域网", "Tailscale"]); mode.SelectedIndex = 0; mode.AccessibleName = "连接方式";
-        var title = new Label { Text = "控制另一台 Windows 电脑", AutoSize = true, Font = new Font(Font.FontFamily, 18, FontStyle.Bold), Location = new Point(16, 14) };
-        var guide = MakeButton("使用指南"); guide.Location = new Point(350, 15); fullscreen.Location = new Point(470, 15);
-        var options = Flow(mode, paste, forget); options.SetBounds(115, 60, 700, 40);
-        var actions = Flow(code, remember, connect, disconnect); actions.SetBounds(12, 180, 700, 40);
-        address.SetBounds(115, 105, 940, 28); fingerprint.SetBounds(115, 141, 940, 28);
-        address.Anchor = fingerprint.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top;
-        status.SetBounds(16, 224, 1040, 32); status.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-        setup.Controls.AddRange([title, guide, fullscreen, new Label { Text = "连接方式", AutoSize = true, Location = new Point(16, 70) },
-            options, new Label { Text = "HTTPS 地址", AutoSize = true, Location = new Point(16, 110) }, address,
-            new Label { Text = "证书指纹", AutoSize = true, Location = new Point(16, 146) }, fingerprint, actions, status]);
+        var guide = MakeButton("使用指南");
+        var heading = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 3, AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink, Margin = new Padding(0, 0, 0, 6) };
+        heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        heading.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        heading.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        heading.Controls.Add(new Label { Text = "控制 Windows 或 Mac", AutoSize = true,
+            Font = new Font(Font.FontFamily, 17, FontStyle.Bold), Anchor = AnchorStyles.Left }, 0, 0);
+        heading.Controls.Add(fullscreen, 1, 0);
+        heading.Controls.Add(guide, 2, 0);
+        setup.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        setup.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        setup.Controls.Add(heading, 0, 0);
+        setup.SetColumnSpan(heading, 2);
+        AddSetting("连接方式", Flow(mode, paste, forget), 1);
+        AddSetting("HTTPS 地址", address, 2);
+        AddSetting("证书指纹", fingerprint, 3);
+        AddSetting("配对码", Flow(code, remember, connect, disconnect), 4);
+        connect.BackColor = Color.FromArgb(18, 101, 86);
+        connect.ForeColor = Color.White;
+        connect.FlatStyle = FlatStyle.Flat;
+        connect.FlatAppearance.BorderSize = 0;
+        setup.Controls.Add(status, 0, 5);
+        setup.SetColumnSpan(status, 2);
+        AcceptButton = connect;
         Controls.Add(view); Controls.Add(setup); view.Controls.Add(tools);
         view.SizeChanged += (_, _) => { tools.PlaceInitially(); tools.ClampToParent(); };
         tools.ToggleControlRequested += async () => { if (controlRequested) ExitControl(true); else await ResumeControlAsync(); };
@@ -77,9 +94,22 @@ internal sealed class WindowsClientForm : Form
         };
         status.TextChanged += (_, _) => UpdateToolbar(); LoadProfile(); UpdateControls();
     }
-    private static Button MakeButton(string title) => new() { Text = title, Width = title.Length > 5 ? 140 : 110, Height = 34, Margin = new Padding(4) };
+    private void AddSetting(string title, Control field, int row)
+    {
+        setup.Controls.Add(new Label { Text = title, AutoSize = true, Anchor = AnchorStyles.Left,
+            Margin = new Padding(3, 3, 14, 3) }, 0, row);
+        field.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        setup.Controls.Add(field, 1, row);
+    }
+    private static Button MakeButton(string title) => new() { Text = title, AutoSize = true,
+        MinimumSize = new Size(76, 31), Padding = new Padding(6, 0, 6, 0), Margin = new Padding(3) };
     private static FlowLayoutPanel Flow(params Control[] controls)
-    { var panel = new FlowLayoutPanel { WrapContents = false, Margin = new Padding(0) }; panel.Controls.AddRange(controls); return panel; }
+    {
+        var panel = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = true, Margin = new Padding(0) };
+        foreach (var child in controls) { child.Anchor = AnchorStyles.Left; panel.Controls.Add(child); }
+        return panel;
+    }
 
     private void SetCanvasMode(bool canvasOnly)
     {
@@ -113,6 +143,7 @@ internal sealed class WindowsClientForm : Form
             var parsed = RemoteClientProfile.ParseConnectionInfo(selectedMode, Clipboard.GetText());
             address.Text = parsed.Address; fingerprint.Text = parsed.Fingerprint; code.Clear();
             status.Text = "已填入地址和指纹。请核对，首次连接还需填写配对码。";
+            code.Focus();
         }
         catch (Exception error) { status.Text = "无法粘贴：" + error.Message; }
     }
@@ -164,22 +195,49 @@ internal sealed class WindowsClientForm : Form
     }
     private async Task ReadFramesAsync(WindowsRemoteClient connected, CancellationToken token)
     {
+        string previousStatus = status.Text;
+        bool waitingForDesktop = false;
         try
         {
             while (!token.IsCancellationRequested)
             {
-                byte[] bytes;
-                try { bytes = await connected.GetFrameAsync(token); }
+                long started = Stopwatch.GetTimestamp();
+                Bitmap frame;
+                try { frame = await Task.Run(async () => DecodeFrame(await connected.GetFrameAsync(token)), token); }
                 catch (RemoteClientException error) when (error.StatusCode == HttpStatusCode.ServiceUnavailable)
-                { ExitControl(false); status.Text = "远程桌面暂不可用，请解锁或关闭系统提示，再恢复键鼠。"; await Task.Delay(700, token); continue; }
-                using var buffer = new MemoryStream(bytes, false); using var decoded = Image.FromStream(buffer);
-                if (decoded.Width > 4096 || decoded.Height > 4096) throw new InvalidDataException("远程画面尺寸过大。");
-                if (token.IsCancellationRequested || client != connected) return;
-                view.SetFrame(new Bitmap(decoded)); await Task.Delay(150, token);
+                {
+                    if (!waitingForDesktop)
+                    {
+                        previousStatus = status.Text;
+                        waitingForDesktop = true;
+                    }
+                    ExitControl(false);
+                    status.Text = "远程桌面暂不可用，请检查解锁状态及屏幕录制权限。";
+                    view.ClearFrame(status.Text);
+                    await Task.Delay(700, token);
+                    continue;
+                }
+                if (token.IsCancellationRequested || client != connected) { frame.Dispose(); return; }
+                view.SetFrame(frame);
+                if (waitingForDesktop)
+                {
+                    status.Text = previousStatus;
+                    waitingForDesktop = false;
+                }
+                var interval = TimeSpan.FromMilliseconds(WindowState == FormWindowState.Minimized ? 1500 : 150);
+                var remaining = interval - Stopwatch.GetElapsedTime(started);
+                if (remaining > TimeSpan.Zero) await Task.Delay(remaining, token);
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception error) { ScheduleFailure(connected, "画面中断：" + error.Message); }
+    }
+    private static Bitmap DecodeFrame(byte[] bytes)
+    {
+        using var buffer = new MemoryStream(bytes, false);
+        using var decoded = Image.FromStream(buffer);
+        if (decoded.Width > 4096 || decoded.Height > 4096) throw new InvalidDataException("远程画面尺寸过大。");
+        return new Bitmap(decoded);
     }
     private void Enqueue(ControlInput input)
     {
@@ -329,7 +387,7 @@ internal sealed class WindowsClientForm : Form
     internal static string GuideDisplayText => GuideText.ReplaceLineEndings(Environment.NewLine);
     internal const string GuideText = """
         一、准备与连接
-        两台 Windows 电脑均使用 2.5.0 或更新版本。被控电脑启动局域网或 Tailscale 服务，控制电脑粘贴被控端复制的两行连接信息，核对证书指纹后输入配对码。添加电脑可保留原手机配对，生成新码即可。
+        被控电脑可以是 Windows 或 Mac。在对方的 PhoneRemote 启动局域网或 Tailscale 服务，粘贴其 HTTPS 地址与证书指纹，核对后输入配对码。Mac 被控端需要允许屏幕录制和辅助功能。添加电脑可保留原手机配对，生成新码即可。
         跨 Wi-Fi 时两端都连接同一个 Tailscale 网络。两种模式独立保存，下次选择对应模式连接。被控电脑需要开机联网、桌面未锁定。
 
         二、直接使用键盘鼠标
@@ -348,7 +406,7 @@ internal sealed class WindowsClientForm : Form
 
         五、断开与排查
         关闭控制窗口或点「断开连接」结束会话，保存的配对保留。主机服务独立运行。同一时刻只有一个有效控制者。
-        超时检查服务、防火墙和 Tailscale；证书不匹配请在被控端重新核对。旧被控端须升级到 2.5.0，手机端无需升级。
+        超时请检查服务、防火墙和 Tailscale。证书不匹配时请在被控端重新核对。Windows 被控端使用 2.5.0 或更新版本，Mac 被控端使用带 Mac 服务的版本。
 
         本机预览与双机验证
         连接本机强制只读预览，防止输入循环。可检查画面、全屏和工具栏；实际异机键鼠、缩放和跨网络仍需第二台电脑实测。

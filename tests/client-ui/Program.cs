@@ -95,13 +95,18 @@ internal static class UiCheck
     private static void Forms(string? screenshots)
     {
         var temp = Path.Combine(Path.GetTempPath(), "PhoneRemoteUiCheck-" + Guid.NewGuid().ToString("N"));
-        foreach (var size in new[] { new Size(1080, 800), new Size(750, 600) })
+        foreach (var size in new[] { new Size(1080, 800), new Size(750, 600), new Size(650, 475) })
         {
-            using var form = new WindowsClientForm(Path.Combine(temp, "profiles.dpapi")) { ClientSize = size };
-            _ = form.Handle; form.PerformLayout();
+            using var form = new WindowsClientForm(Path.Combine(temp, "profiles.dpapi"))
+                { ClientSize = size, Opacity = 0, ShowInTaskbar = false };
+            form.Show(); form.PerformLayout();
             var view = Field<WindowsRemoteView>(form, "view"); var toolbar = Field<RemoteToolbar>(form, "tools");
             var setup = Field<Panel>(form, "setup"); var address = Field<TextBox>(form, "address"); var fingerprint = Field<TextBox>(form, "fingerprint");
-            Check(view.Height >= 300 && view.Top == setup.Bottom, "connection setup leaves usable viewport");
+            Check(view.Height >= size.Height / 2 && view.Top == setup.Bottom, "connection setup leaves usable viewport");
+            var connect = Field<Button>(form, "connect");
+            var disconnect = Field<Button>(form, "disconnect");
+            Check(connect.Right <= connect.Parent!.ClientSize.Width && disconnect.Right <= disconnect.Parent!.ClientSize.Width,
+                "pairing actions fit alongside a narrow address field");
             Check(address.Right <= setup.Width && address.Width > 200 && fingerprint.Width == address.Width, "address fields fit normal and minimum window widths");
             Check(address.Bottom <= fingerprint.Top, "address rows never overlap");
             Check(!view.InputEnabled && !toolbar.Expanded, "disconnected starts readonly with collapsed toolbar");

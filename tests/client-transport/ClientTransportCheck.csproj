@@ -10,6 +10,7 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <Compile Include="../../windows/WindowsRemoteClient.cs" />
     <Compile Include="../../windows/WindowsClientProfiles.cs" />
+    <Compile Include="../../windows/ControlInput.cs" />
     <Compile Include="../../windows/Desktop.cs" />
   </ItemGroup>
 </Project>

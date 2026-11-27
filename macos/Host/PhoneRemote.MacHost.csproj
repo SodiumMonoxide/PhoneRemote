@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>2.6.0</Version>
+    <DefineConstants>$(DefineConstants);PHONEREMOTE_MAC</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Compile Include="../../windows/ControlInput.cs;../../windows/RemoteServer.cs;../../windows/RemoteControlSession.cs;../../windows/LocalIdentity.cs;../../windows/ConnectionAddress.cs" />
+    <EmbeddedResource Include="../../windows/Web/*" LogicalName="Web.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

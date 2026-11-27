@@ -53,7 +53,7 @@ internal sealed partial class HostForm
         _trayLan.Click += (_, _) => { _lan.Selector.Checked = true; RestoreWindow(); };
         _trayTailscale.Click += (_, _) => { _tailscale.Selector.Checked = true; RestoreWindow(); };
         _trayMenu.Items.Add(new ToolStripSeparator());
-        _trayMenu.Items.Add("控制另一台电脑", null, (_, _) => ShowComputerClient());
+        _trayMenu.Items.Add(_controlComputer.Text, null, (_, _) => ShowComputerClient());
         _trayMenu.Items.Add("使用指南", null, (_, _) => ShowGuide());
         _trayMenu.Items.Add(_trayExit);
         _trayExit.Click += (_, _) => RequestExit();

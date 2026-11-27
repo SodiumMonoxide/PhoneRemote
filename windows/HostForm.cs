@@ -17,8 +17,8 @@ internal sealed partial class HostForm : Form
     private readonly ComboBox _addresses = new() { DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly Button _refreshAddresses = MakeButton("刷新", 78);
     private readonly Button _startStop = MakeButton("启动连接", 106);
-    private readonly Button _guide = MakeButton("使用指南", 106);
-    private readonly Button _controlComputer = MakeButton("控制另一台电脑", 154);
+    private readonly Button _guide = MakeButton("使用指南", 88);
+    private readonly Button _controlComputer = MakeButton("控制 Windows 或 Mac", 180);
     private WindowsClientForm? _clientWindow;
     private readonly Button _copyConnection = MakeButton("复制连接信息", 132);
     private readonly Button _copyAddress = MakeButton("复制", 78);
@@ -47,7 +47,7 @@ internal sealed partial class HostForm : Form
     public HostForm()
     {
         _mode = _lan;
-        Text = "PhoneRemote · 本机被控端";
+        Text = "PhoneRemote · 电脑遥控";
         Font = new Font("Microsoft YaHei UI", 10F);
         ForeColor = Ink;
         BackColor = Color.White;
@@ -84,26 +84,27 @@ internal sealed partial class HostForm : Form
 
         var header = new TableLayoutPanel
         {
-            ColumnCount = 2,
+            ColumnCount = 3,
             Dock = DockStyle.Top,
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            Padding = new Padding(24, 20, 24, 19)
+            Padding = new Padding(24, 12, 24, 14)
         };
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         var title = MakeLabel("PhoneRemote", Ink);
-        title.Font = new Font(Font.FontFamily, 23F, FontStyle.Bold);
+        title.Font = new Font(Font.FontFamily, 18F, FontStyle.Bold);
+        title.Anchor = AnchorStyles.Left;
         title.Margin = new Padding(0, 0, 0, 5);
-        var subtitle = MakeLabel("本机被控端 · 接受手机或 Windows 电脑连接。", Muted);
-        subtitle.Margin = new Padding(0);
         _guide.Anchor = AnchorStyles.Right;
+        _controlComputer.Anchor = AnchorStyles.Right;
         header.Controls.Add(title, 0, 0);
-        header.Controls.Add(_guide, 1, 0);
-        header.Controls.Add(subtitle, 0, 1);
-        header.SetColumnSpan(subtitle, 2);
-        header.Controls.Add(_controlComputer, 0, 2);
-        header.SetColumnSpan(_controlComputer, 2);
+        header.Controls.Add(_controlComputer, 1, 0);
+        header.Controls.Add(_guide, 2, 0);
+        var subtitle = MakeLabel("允许其他设备控制本机", Ink);
+        subtitle.Font = new Font(Font.FontFamily, 14F, FontStyle.Bold);
+        AddRow(content, subtitle, 8);
         var modes = new TableLayoutPanel
         {
             ColumnCount = 2,
@@ -118,8 +119,7 @@ internal sealed partial class HostForm : Form
         _tailscale.Selector.Margin = new Padding(5, 0, 0, 0);
         modes.Controls.Add(_lan.Selector, 0, 0);
         modes.Controls.Add(_tailscale.Selector, 1, 0);
-        header.Controls.Add(modes, 0, 3);
-        header.SetColumnSpan(modes, 2);
+        AddRow(content, modes, 12);
 
         AddRow(content, MakeLabel("电脑的连接地址", Ink), 3);
         AddRow(content, MakeFieldRow(_addresses, _refreshAddresses, _startStop), 4);
@@ -150,7 +150,7 @@ internal sealed partial class HostForm : Form
 
         AddRow(content, MakeLabel("控制端访问地址", Ink), 3);
         AddRow(content, MakeFieldRow(_address, _copyAddress, _copyConnection), 8);
-        AddRow(content, MakeLabel("在安卓 App 或另一台电脑的控制端粘贴连接信息，再输入配对码。", Muted), 12);
+        AddRow(content, MakeLabel("在 Android、Windows 或 Mac 控制端粘贴连接信息。", Muted), 12);
 
         AddRow(content, MakeLabel("证书 SHA-256 指纹", Ink), 3);
         AddRow(content, MakeFieldRow(_fingerprint, _copyFingerprint), 8);

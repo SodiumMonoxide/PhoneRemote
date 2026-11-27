@@ -277,7 +277,7 @@ internal sealed class RemoteServer : IAsyncDisposable
         }
         if (context.Request.Path.Value == "/api/capabilities")
         {
-            await context.Response.WriteAsJsonAsync(new { rawKeyboard = true, version = "2.5.0" }, context.RequestAborted);
+            await context.Response.WriteAsJsonAsync(new { rawKeyboard = true, platform = OperatingSystem.IsMacOS() ? "macos" : "windows", version = "2.6.0" }, context.RequestAborted);
             return;
         }
         byte[]? frame = control.Capture();

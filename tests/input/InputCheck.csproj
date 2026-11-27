@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Compile Include="../../windows/ControlInput.cs" Link="ControlInput.cs" />
     <Compile Include="../../windows/Desktop.cs" Link="Desktop.cs" />
     <Compile Include="../../windows/RemoteControlSession.cs" Link="RemoteControlSession.cs" />
   </ItemGroup>
