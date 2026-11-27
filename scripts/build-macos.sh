@@ -62,6 +62,8 @@ chmod +x "$resources/StartHost.command"
 ditto "$root/third_party/runtime/.NET" "$resources/Notices/dotnet"
 ditto "$root/third_party/runtime/ASP.NET Core" "$resources/Notices/aspnet"
 plutil -lint "$contents/Info.plist"
+# Remove debug-map paths from locally compiled binaries before signing the bundle.
+xcrun strip -S "$helpers/libPhoneRemoteQuartz.dylib" "$contents/MacOS/PhoneRemote"
 codesign --force --sign - --identifier work.codex.phoneremote.mac.host \
     --entitlements "$root/macos/App/Host.entitlements" "$helpers/PhoneRemote.MacHost"
 codesign --force --sign - "$helpers/libPhoneRemoteQuartz.dylib"

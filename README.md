@@ -6,7 +6,7 @@ Windows 和 Mac 版均为 **2.6.0**。Android 继续使用 **2.3.0**，现有手
 
 ## 下载和安装
 
-本地 2.6.0 构建提供以下文件。此前发布的 Windows 和 Android 版本可在仓库的 Releases 页面找到。
+在 [2.6.0 发布页](https://github.com/SodiumMonoxide/PhoneRemote/releases/tag/v2.6.0) 下载与电脑匹配的安装包、源码和 SHA-256 校验清单。Android 版可在仓库的 Releases 页面找到。
 
 - `PhoneRemote-v2.6.0-Windows-x64.zip` 为 Windows 便携版。完整解压到固定目录后运行 `PhoneRemote.exe`，同时包含控制端和被控端。
 - `PhoneRemote-v2.6.0-macOS-Apple-Silicon.zip` 和 `PhoneRemote-v2.6.0-macOS-Intel.zip` 分别适用于 Apple 芯片和 Intel 芯片的 Mac，最低部署版本为 macOS 14。解压后将 `PhoneRemote.app` 拖入「应用程序」，已内置控制端、被控端和运行时。当前为本地签名构建，尚未经过 Apple 公证。
