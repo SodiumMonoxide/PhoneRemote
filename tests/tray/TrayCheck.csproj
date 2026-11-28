@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="../../windows/HostForm.cs" Link="HostForm.cs" />
     <Compile Include="../../windows/HostForm.Tray.cs" Link="HostForm.Tray.cs" />
+    <Compile Include="../../windows/HostForm.Ipad.cs" Link="HostForm.Ipad.cs" />
     <Compile Include="../../windows/CloseOptionsForm.cs" Link="CloseOptionsForm.cs" />
     <Compile Include="../../windows/GuideForm.cs" Link="GuideForm.cs" />
   </ItemGroup>

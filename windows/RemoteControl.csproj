@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>PhoneRemote</AssemblyName>
-    <Version>2.6.0</Version>
+    <Version>2.7.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <RootNamespace>RemoteControl</RootNamespace>
     <Product>PhoneRemote</Product>
@@ -17,5 +17,12 @@
     <EmbeddedResource Include="Web\index.html" LogicalName="Web.index.html" />
     <EmbeddedResource Include="Web\styles.css" LogicalName="Web.styles.css" />
     <EmbeddedResource Include="Web\app.js" LogicalName="Web.app.js" />
+    <Content Include="..\modules\ipad-display\**\*.ps1;..\modules\ipad-display\**\*.py;..\modules\ipad-display\**\requirements*.txt;..\modules\ipad-display\**\README.md;..\modules\ipad-display\**\*.html;..\modules\ipad-display\**\*.js;..\modules\ipad-display\**\*.css;..\modules\ipad-display\**\*.png;..\modules\ipad-display\**\*.webmanifest"
+             Exclude="..\modules\ipad-display\**\.venv\**">
+      <Link>modules\ipad-display\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
   </ItemGroup>
 </Project>

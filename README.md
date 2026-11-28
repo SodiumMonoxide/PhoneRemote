@@ -1,21 +1,28 @@
-# PhoneRemote · Mac 与 Windows 远程控制
+# PhoneRemote · 电脑遥控与 iPad 副屏
 
-PhoneRemote 2.6.0 支持 Mac 控制 Windows、Windows 控制 Mac、两台 Mac 互控，以及原有的 Windows 互控和 Android 控制 Windows。同一可信局域网可直连，异地可通过两端的 Tailscale 连接。
+PhoneRemote 支持 Windows 与 Mac 之间遥控、两台 Windows 或 Mac 互控，以及 Android 控制 Windows。同一可信局域网可直连，异地可通过两端的 Tailscale 连接。
 
-Windows 和 Mac 版均为 **2.6.0**。Android 继续使用 **2.3.0**，现有手机可沿用原配对。本次已在 Windows 验证协议、客户端和控制页面。Mac 主控的 AppKit 界面、被控端的系统授权与双机键鼠仍待 Mac 实机验证。
+Windows **2.7.0** 新增「iPad 副屏」。同一局域网内的 iPad 可以显示 Windows 扩展桌面。已配对的 iPad 可继续使用原来的主屏幕图标。Mac 使用 **2.6.0**，Android 使用 **2.3.0**。
+
+2.6.0 版已在 Windows 验证协议、客户端和控制页面。Mac 主控的 AppKit 界面、被控端的系统授权与双机键鼠仍待 Mac 实机验证。
 
 ## 下载和安装
 
-在 [2.6.0 发布页](https://github.com/SodiumMonoxide/PhoneRemote/releases/tag/v2.6.0) 下载与电脑匹配的安装包、源码和 SHA-256 校验清单。Android 版可在仓库的 Releases 页面找到。
+- **Windows**：下载 `PhoneRemote-v2.7.0-Windows-x64.zip`，完整解压到固定目录后运行 `PhoneRemote.exe`。请保留同目录的 `modules` 文件夹。发布页也提供源码及 SHA-256 校验清单。[Windows 2.7.0 发布页](https://github.com/SodiumMonoxide/PhoneRemote/releases/tag/v2.7.0)
+- **Mac**：`PhoneRemote-v2.6.0-macOS-Apple-Silicon.zip` 和 `PhoneRemote-v2.6.0-macOS-Intel.zip` 分别适用于 Apple 芯片和 Intel 芯片的 Mac，要求 macOS 14 或更高版本。解压后将 `PhoneRemote.app` 拖入「应用程序」。应用内置控制端、被控端和运行时，采用本地签名，尚未经过 Apple 公证。[Mac 2.6.0 发布页](https://github.com/SodiumMonoxide/PhoneRemote/releases/tag/v2.6.0)
+- **Android**：下载 `PhoneRemote-v2.3.0-Android.apk`。已配对的手机可继续连接。[Android 2.3.0 发布页](https://github.com/SodiumMonoxide/PhoneRemote/releases/tag/v2.3.0)
 
-- `PhoneRemote-v2.6.0-Windows-x64.zip` 为 Windows 便携版。完整解压到固定目录后运行 `PhoneRemote.exe`，同时包含控制端和被控端。
-- `PhoneRemote-v2.6.0-macOS-Apple-Silicon.zip` 和 `PhoneRemote-v2.6.0-macOS-Intel.zip` 分别适用于 Apple 芯片和 Intel 芯片的 Mac，最低部署版本为 macOS 14。解压后将 `PhoneRemote.app` 拖入「应用程序」，已内置控制端、被控端和运行时。当前为本地签名构建，尚未经过 Apple 公证。
-
-安卓手机可继续使用已发布的 `PhoneRemote-v2.3.0-Android.apk`。
+在 PowerShell 运行 `Get-FileHash .\PhoneRemote-v2.7.0-Windows-x64.zip -Algorithm SHA256`，与发布页的校验清单比对。若 Windows 因下载标记而拒绝运行副屏模块脚本，请先核对散列，再打开原 ZIP 的「属性 → 解除锁定」并重新完整解压。可保留现有的 PowerShell 执行策略。
 
 Windows 版适用于 Windows 11 x64，Android 版需要 Android 10 及以上。Windows 包自带运行时。被控电脑须开机、联网、用户桌面已解锁，且已启动遥控服务。Windows EXE 尚未进行 Authenticode 签名。
 
 ## 第一次连接
+
+### 在 Windows 上把 iPad 用作扩展屏
+
+在新电脑上首次使用副屏，需要 Windows 11 x64 和 Python 3.12 x64。打开 PhoneRemote，选择「iPad 副屏」以启动服务，首次配置时按提示点「配置驱动和网络」。已安装独立副屏的电脑可以沿用原环境。让 iPad 与电脑接入同一局域网，从原来的「Wi-Fi 副屏」图标点「连接屏幕」，即可沿用已保存的配对。
+
+首次配对时，在标签页打开配对控制台，按提示设置 iPad，并用六位「今日配对码」连接。使用电脑键鼠把窗口拖过主屏右边缘，即可移到 iPad。轻点 iPad 画面可以打开全屏和操作说明。详细步骤见[使用指南](docs/使用指南.md#ipad-副屏)。
 
 ### Mac 与 Windows 互控、两台 Mac 互控
 

@@ -1,6 +1,6 @@
 # Windows 电脑遥控指南
 
-适用 Windows 2.6.0。两台 Windows 分别使用被控端和控制端，Android 2.3.0 可继续连接。若其中一台电脑是 Mac，请参阅 [Mac 互控指南](Mac互控指南.md)。
+适用 Windows 2.7.0。两台 Windows 分别使用被控端和控制端，Android 2.3.0 可继续连接。若其中一台电脑是 Mac，请参阅 [Mac 互控指南](Mac互控指南.md)。
 
 ## 第一次连接
 

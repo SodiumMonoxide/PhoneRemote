@@ -10,6 +10,36 @@ internal sealed class WindowsClientForm : Form
 }
 
 internal sealed record ServerStatus(string? Code, DateTimeOffset? CodeExpiresAt, bool Connected, bool RememberedDevice);
+internal sealed class IpadDisplayModule
+{
+    public static Uri ConsoleUri { get; } = new("http://127.0.0.1:8442/");
+    public bool OwnsService { get; private set; }
+    public bool DisplayAvailable { get; set; } = true;
+    public int VideoPort => Existing ? 8443 : 8453;
+    public int Starts { get; private set; }
+    public int Stops { get; private set; }
+    public bool Existing { get; set; }
+    public bool FailStop { get; set; }
+    public TaskCompletionSource? Starting { get; set; }
+    public async Task StartAsync()
+    {
+        Starts++;
+        if (Starting is not null) await Starting.Task;
+        OwnsService = !Existing;
+    }
+    public Task ConfigureAsync() => Task.CompletedTask;
+    public Task StopAsync(bool includeExisting = false)
+    {
+        if (FailStop) throw new IOException("测试停止失败");
+        if (OwnsService || (includeExisting && Existing))
+        {
+            Stops++;
+            Existing = false;
+        }
+        OwnsService = false;
+        return Task.CompletedTask;
+    }
+}
 internal sealed class RemoteControlSession
 {
     internal object StateLock { get; } = new();
@@ -60,6 +90,7 @@ internal static class Program
             try
             {
                 await CheckLifecycle();
+                await CheckIpadModule();
                 await CheckBusyExit();
                 await CheckSystemShutdown();
                 CheckScaledLayouts();
@@ -139,6 +170,64 @@ internal static class Program
         Check(RemoteServer.Active.Count == 0 && host.IsDisposed, "Late-started server is stopped on exit");
     }
 
+    private static async Task CheckIpadModule()
+    {
+        using var host = NewHost();
+        var sections = Field<TabControl>(host, "_sections");
+        var module = Field<IpadDisplayModule>(host, "_ipadModule");
+        Check(sections.SelectedTab?.Text == "电脑遥控" && module.Starts == 0, "No iPad work at application startup");
+        sections.SelectedTab = sections.TabPages.Cast<TabPage>().Single(p => p.Text == "iPad 副屏");
+        Check(module.Starts == 1 && Button(host, "打开配对控制台").Enabled, "Selecting iPad starts module and enables console");
+        Button(host, "停止副屏").PerformClick();
+        Check(module.Stops == 1 && !Button(host, "打开配对控制台").Enabled, "Explicit stop disables the console");
+        Button(host, "启动副屏").PerformClick();
+        Button(host, "后台运行").PerformClick();
+        Check(!host.Visible && module.OwnsService, "Background retains iPad service");
+        var menu = Field<ContextMenuStrip>(host, "_trayMenu");
+        menu.Items.OfType<ToolStripMenuItem>().Single(i => i.Text!.StartsWith("局域网 ·")).PerformClick();
+        Check(host.Visible && sections.SelectedIndex == 0 && module.OwnsService, "Tray remote shortcut switches to remote while keeping iPad active");
+        menu.Items.OfType<ToolStripMenuItem>().Single(i => i.Text!.StartsWith("iPad 副屏")).PerformClick();
+        Check(sections.SelectedTab?.Text == "iPad 副屏" && module.Starts == 3, "Tray iPad shortcut starts or reuses service");
+        var closed = Closed(host);
+        Button(host, "退出应用").PerformClick();
+        await closed.WaitAsync(TimeSpan.FromSeconds(3));
+        Check(module.Stops == 2 && !module.OwnsService, "Exit releases the owned iPad service");
+
+        using var adoptedHost = NewHost();
+        var adopted = Field<IpadDisplayModule>(adoptedHost, "_ipadModule");
+        adopted.Existing = true;
+        Field<TabControl>(adoptedHost, "_sections").SelectedIndex = 1;
+        Check(Button(adoptedHost, "停止副屏").Visible, "Reused external service has an explicit stop action");
+        var adoptedClosed = Closed(adoptedHost);
+        Button(adoptedHost, "退出应用").PerformClick();
+        await adoptedClosed.WaitAsync(TimeSpan.FromSeconds(3));
+        Check(adopted.Stops == 0, "Exit preserves a preexisting standalone iPad service");
+
+        using var switchHost = NewHost();
+        var external = Field<IpadDisplayModule>(switchHost, "_ipadModule");
+        external.Existing = true;
+        Field<TabControl>(switchHost, "_sections").SelectedIndex = 1;
+        external.FailStop = true;
+        Button(switchHost, "停止副屏").PerformClick();
+        Check(external.Existing && Button(switchHost, "停止副屏").Enabled, "Failed stop keeps the adopted service available for retry");
+        external.FailStop = false;
+        Button(switchHost, "停止副屏").PerformClick();
+        Check(!external.Existing && external.Stops == 1, "An explicit stop releases the old service's port");
+        Button(switchHost, "退出应用").PerformClick();
+
+        using var startingHost = NewHost();
+        var starting = Field<IpadDisplayModule>(startingHost, "_ipadModule");
+        starting.Starting = new TaskCompletionSource();
+        Field<TabControl>(startingHost, "_sections").SelectedIndex = 1;
+        var startingClosed = Closed(startingHost);
+        Button(startingHost, "退出应用").PerformClick();
+        Check(!startingHost.IsDisposed, "Exit waits for an in-progress iPad startup");
+        starting.Starting.SetResult();
+        await startingClosed.WaitAsync(TimeSpan.FromSeconds(3));
+        Check(starting.Stops == 1, "Exit stops an iPad service that finishes starting");
+        Console.WriteLine("PASS iPad tab selection, stop, tray, standalone reuse, exit during startup");
+    }
+
     private static async Task CheckSystemShutdown()
     {
         using var host = NewHost();
@@ -176,6 +265,14 @@ internal static class Program
                 $"Footer buttons fit at scale {scale}");
             Check(exit.Parent!.Bounds.Right <= exit.Parent.Parent!.ClientSize.Width, $"Footer actions fit at scale {scale}");
             Capture(host, $"host-minimum-{scale * 100:0}.png");
+            var sections = Field<TabControl>(host, "_sections");
+            sections.SelectedIndex = 1;
+            var ipadPage = sections.SelectedTab!;
+            ipadPage.PerformLayout();
+            Check(!ipadPage.HorizontalScroll.Visible, $"iPad panel avoids sideways scrolling at scale {scale}");
+            foreach (var action in Descendants(ipadPage).OfType<Button>().Where(b => b.Visible))
+                Check(action.Right <= action.Parent!.ClientSize.Width, $"iPad control fits at scale {scale}: {action.Text}");
+            Capture(host, $"ipad-minimum-{scale * 100:0}.png");
             using var close = new CloseOptionsForm { Opacity = 0 };
             close.Show();
             ScaleForLayoutTest(close, scale);

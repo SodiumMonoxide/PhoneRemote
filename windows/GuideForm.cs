@@ -32,6 +32,11 @@ internal sealed class GuideForm : Form
         };
 
         using var heading = new Font(Font.FontFamily, 12.5F, FontStyle.Bold);
+        AddSection(guide, heading, "把 iPad 用作副屏", """
+            选择主窗口的「iPad 副屏」即可启动或接入副屏服务。让 iPad 和电脑连入同一局域网，从原来的「Wi-Fi 副屏」图标打开，横放后点「连接屏幕」。
+            首次使用，在「iPad 副屏」页点「打开配对控制台」，按安装说明设置 iPad。输入六位今日配对码后，在电脑控制台允许连接。已配对的 iPad 可以直接重连。
+            在电脑上把窗口拖过主屏右边缘即可移到 iPad。轻点 iPad 画面可打开全屏控制和操作说明。切回「电脑遥控」或收起主窗口后可继续使用副屏。
+            """);
         AddSection(guide, heading, "用 Windows 控制另一台电脑", """
             要控制 Windows 或 Mac，在对方电脑上启动 PhoneRemote 被控服务，在本机点「控制 Windows 或 Mac」。Mac 作为被控端时需要允许屏幕录制和辅助功能。
             从对方电脑取得 HTTPS 地址和证书指纹，将两行内容传到本机，选择相同的局域网或 Tailscale 模式，点「粘贴连接信息」，再核对地址和指纹。

@@ -159,7 +159,7 @@ internal sealed partial class HostForm : Form
 
         var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
         scroll.Controls.Add(content);
-        Controls.Add(scroll);
+        Controls.Add(CreateModuleTabs(scroll));
         Controls.Add(CreateWindowActions());
         Controls.Add(header);
 
@@ -301,7 +301,13 @@ internal sealed partial class HostForm : Form
         catch (Exception ex)
         {
             if (!_closeRequested)
-                MessageBox.Show(this, ex.Message, "无法切换连接状态", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            {
+                var detail = ex.Message;
+                if (!mode.IsTailscale && ex.GetBaseException() is System.Net.Sockets.SocketException
+                    { SocketErrorCode: System.Net.Sockets.SocketError.AddressAlreadyInUse or System.Net.Sockets.SocketError.AccessDenied })
+                    detail += "\n\n请检查局域网地址的 8443 端口。若旧版 iPad 副屏正在使用它，请到「iPad 副屏」页点「停止副屏」，再返回这里启动连接。";
+                MessageBox.Show(this, detail, "无法切换连接状态", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
         finally
         {
@@ -341,11 +347,11 @@ internal sealed partial class HostForm : Form
         }
 
         _closeRequested = true;
-        if (!_busy && _lan.Server is null && _tailscale.Server is null && (_clientWindow is null || _clientWindow.IsDisposed))
+        if (!_busy && !_ipadBusy && !_ipadModule.OwnsService && _lan.Server is null && _tailscale.Server is null && (_clientWindow is null || _clientWindow.IsDisposed))
             return;
 
         e.Cancel = true;
-        if (_busy)
+        if (_busy || _ipadBusy)
         {
             UpdateDisplay();
             return;
@@ -358,7 +364,8 @@ internal sealed partial class HostForm : Form
         {
             if (_clientWindow is { IsDisposed: false })
                 await _clientWindow.ShutdownAsync();
-            await Task.WhenAll(StopModeAsync(_lan), StopModeAsync(_tailscale));
+            await Task.WhenAll(StopModeAsync(_lan), StopModeAsync(_tailscale),
+                _ipadModule.StopAsync());
         }
         catch (Exception ex)
         {
@@ -399,6 +406,7 @@ internal sealed partial class HostForm : Form
         UpdateModeSelector(_lan, lanStatus);
         UpdateModeSelector(_tailscale, tailscaleStatus);
         UpdateTray(lanStatus, tailscaleStatus);
+        if (_closeRequested) UpdateIpadActions();
         _lan.Selector.Enabled = _tailscale.Selector.Enabled = !_busy && !_closeRequested;
 
         _addresses.Enabled = !_busy && server is null;

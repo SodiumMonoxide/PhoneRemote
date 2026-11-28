@@ -27,7 +27,7 @@ internal sealed class CloseOptionsForm : Form
         };
         var message = new Label
         {
-            Text = "后台运行：已启动的连接保持运行，右下角托盘显示状态。\n退出应用：停止两种服务，结束手机遥控，保留已有配对。",
+            Text = "后台运行时，遥控连接和 iPad 副屏会继续工作。\n退出应用时，将停止由 PhoneRemote 启动的服务并保留已有配对。",
             Dock = DockStyle.Fill,
             Padding = new Padding(22, 4, 22, 8),
             AutoSize = false

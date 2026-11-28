@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "无线副屏",
+  "short_name": "无线副屏",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#101b22",
+  "theme_color": "#101b22",
+  "icons": [
+    { "src": "/touch-icon.png", "type": "image/png", "sizes": "180x180" },
+    { "src": "/app-icon.png", "type": "image/png", "sizes": "512x512", "purpose": "any" }
+  ]
+}

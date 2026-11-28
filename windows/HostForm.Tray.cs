@@ -11,6 +11,7 @@ internal sealed partial class HostForm
     private readonly ContextMenuStrip _trayMenu = new();
     private readonly ToolStripMenuItem _trayLan = new();
     private readonly ToolStripMenuItem _trayTailscale = new();
+    private readonly ToolStripMenuItem _trayIpad = new("iPad 副屏");
     private readonly ToolStripMenuItem _trayExit = new("退出应用");
     private readonly Button _background = MakeButton("后台运行", 106);
     private readonly Button _exit = MakeButton("退出应用", 106);
@@ -49,9 +50,17 @@ internal sealed partial class HostForm
         restore.Font = new Font(_trayMenu.Font, FontStyle.Bold);
         _trayMenu.Items.Add(restore);
         _trayMenu.Items.Add(new ToolStripSeparator());
-        _trayMenu.Items.AddRange([_trayLan, _trayTailscale]);
-        _trayLan.Click += (_, _) => { _lan.Selector.Checked = true; RestoreWindow(); };
-        _trayTailscale.Click += (_, _) => { _tailscale.Selector.Checked = true; RestoreWindow(); };
+        _trayMenu.Items.AddRange([_trayLan, _trayTailscale, _trayIpad]);
+        _trayLan.Click += (_, _) => { _sections.SelectedIndex = 0; _lan.Selector.Checked = true; RestoreWindow(); };
+        _trayTailscale.Click += (_, _) => { _sections.SelectedIndex = 0; _tailscale.Selector.Checked = true; RestoreWindow(); };
+        _trayIpad.Click += async (_, _) =>
+        {
+            RestoreWindow();
+            if (_sections.SelectedTab == _ipadPage)
+                await SetIpadRunningAsync(true);
+            else
+                _sections.SelectedTab = _ipadPage;
+        };
         _trayMenu.Items.Add(new ToolStripSeparator());
         _trayMenu.Items.Add(_controlComputer.Text, null, (_, _) => ShowComputerClient());
         _trayMenu.Items.Add("使用指南", null, (_, _) => ShowGuide());
@@ -129,12 +138,14 @@ internal sealed partial class HostForm
             : state is not null ? "运行中，等待配对" : "未启动";
         _trayLan.Text = $"局域网 · {Describe(lan)}";
         _trayTailscale.Text = $"Tailscale · {Describe(tailscale)}";
+        _trayIpad.Text = _ipadReady ? "iPad 副屏 · 服务已启动" : "iPad 副屏";
         _tray.Text = _closeRequested ? "PhoneRemote · 正在退出…"
-            : $"PhoneRemote\n局域网：{Describe(lan)}\nTailscale：{Describe(tailscale)}";
+            : $"PhoneRemote\n局域网：{Describe(lan)}\nTailscale：{Describe(tailscale)}" + (_ipadReady ? "\niPad 副屏服务已启动" : "");
         _tray.Icon = lan?.Connected == true || tailscale?.Connected == true ? _connectedIcon
-            : lan is not null || tailscale is not null ? _runningIcon : _stoppedIcon;
+            : lan is not null || tailscale is not null || _ipadReady ? _runningIcon : _stoppedIcon;
         _trayExit.Enabled = _exit.Enabled = _background.Enabled = !_closeRequested;
         _trayLan.Enabled = _trayTailscale.Enabled = !_busy && !_closeRequested;
+        _trayIpad.Enabled = !_closeRequested;
     }
 
     protected override void Dispose(bool disposing)

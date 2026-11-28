@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#101b22">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="无线副屏">
+  <title>无线副屏</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/touch-icon.png">
+  <link rel="icon" type="image/png" href="/touch-icon.png">
+  <link rel="stylesheet" href="/receiver.css?v=5">
+  <script src="/receiver.js?v=6" defer></script>
+</head>
+<body>
+  <main id="receiver">
+    <section id="lobby" aria-labelledby="page-title">
+      <div class="panel">
+        <div class="masthead">
+          <img class="app-icon" alt="" src="/touch-icon.png" width="54" height="54">
+          <div class="state" role="status"><span class="dot"></span><span id="state-label">待连接</span></div>
+        </div>
+        <h1 id="page-title">无线副屏</h1>
+        <p id="source-label" class="source">Windows 扩展桌面</p>
+        <form id="connect-form">
+          <div id="pair-field" hidden>
+            <label for="pair-link">今日配对码</label>
+            <input id="pair-link" type="password" inputmode="numeric" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" maxlength="4096" placeholder="输入电脑显示的 6 位数字" />
+          </div>
+          <p id="message" class="message" role="status">正在检查连接环境…</p>
+          <button id="connect" type="submit" class="primary">连接屏幕</button>
+          <button id="compat" type="button" class="secondary">兼容连接</button>
+        </form>
+        <button id="copy-link" class="secondary" type="button" hidden>复制配对链接</button>
+        <button id="new-pair" class="secondary" type="button" hidden>更换配对码</button>
+        <button id="use-saved" class="secondary" type="button" hidden>使用原配对</button>
+        <input id="manual-copy" aria-label="请长按复制配对链接" readonly hidden>
+        <button id="lobby-guide" class="guide-link" type="button" aria-haspopup="dialog" aria-controls="guide">操作说明</button>
+      </div>
+    </section>
+    <section id="stage" hidden aria-label="电脑画面">
+      <video id="screen" autoplay muted playsinline webkit-playsinline disablepictureinpicture></video>
+      <canvas id="frames" hidden aria-label="兼容连接的电脑画面"></canvas>
+      <div id="toolbar" role="group" aria-label="显示控制">
+        <span id="live-label" class="live"><span class="dot"></span>扩展桌面</span>
+        <button id="play" type="button" hidden>播放</button>
+        <button id="stage-compat" type="button" hidden>兼容连接</button>
+        <button id="fit" type="button" aria-pressed="false" title="填满屏幕，两端可能被裁切">填满屏幕</button>
+        <button id="full" type="button">全屏</button>
+        <button id="stage-guide" type="button" aria-haspopup="dialog" aria-controls="guide">操作说明</button>
+        <button id="disconnect" type="button">断开</button>
+      </div>
+      <p id="notice" role="status" hidden></p>
+    </section>
+  </main>
+  <dialog id="guide" aria-labelledby="guide-title">
+    <header><h2 id="guide-title">操作说明</h2><button id="close-guide" type="button" autofocus>关闭说明</button></header>
+    <div class="guide-body" tabindex="0" role="region" aria-label="操作步骤">
+      <h3>连接到电脑</h3>
+      <p>让 iPad 和电脑接入同一局域网。在电脑上打开 PhoneRemote，选择「iPad 副屏」。</p>
+      <p>已配对时，从主屏幕打开原来的「Wi-Fi 副屏」，点一次「连接屏幕」，等待画面出现。</p>
+      <p>首次配对时，输入控制台上的 6 位「今日配对码」，点「连接屏幕」，再在电脑上点「允许连接」。配对码在北京时间零点更新，已保存的配对第二天仍可使用。</p>
+      <h3>把窗口移到 iPad</h3>
+      <p>在电脑上拖住窗口标题栏，越过主屏右边缘即可移到副屏。如果 Windows 调整过显示器排列，就往副屏所在的方向拖。用电脑的鼠标和键盘操作窗口。</p>
+      <h3>全屏与画面大小</h3>
+      <p>轻点 iPad 画面可调出工具栏。点「全屏」放大显示区域。如果 iPad 仍处于分屏，可在系统窗口菜单中切换全屏。</p>
+      <p>想看清桌面四周，保持「填满屏幕」关闭。想去掉黑边，点「填满屏幕」，部分边缘可能会被裁切。再点一次可恢复。</p>
+      <h3>没有画面或需要重连</h3>
+      <p>如果看到「播放」，先点它。仍没有画面时，点「兼容连接」重试，兼容模式的帧率较低。</p>
+      <p>用完后，轻点画面并选「断开」。下次从同一图标点「连接屏幕」或「重新连接」即可。</p>
+      <details id="home-help">
+        <summary>从 Safari 添加到主屏幕</summary>
+        <p>在 Safari 的「分享」菜单中选择「添加到主屏幕」。如果从新图标首次打开时提示配对，用电脑上的今日配对码连接一次。</p>
+      </details>
+    </div>
+  </dialog>
+</body>
+</html>
